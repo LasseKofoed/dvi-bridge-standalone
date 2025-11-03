@@ -9,7 +9,7 @@ import time
 import threading
 import warnings
 
-load_dotenv("/home/lrp/.env")  # this will read .env in the current directory
+load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Modbus setup
@@ -33,6 +33,15 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 # MQTT setup
 mqtt_client = mqtt.Client()
 mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("✅ Connected to MQTT broker")
+        for t in command_map:
+            client.subscribe(t)
+    else:
+        print(f"❌ MQTT connection failed with code {rc}")
+
 mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
 
 def publish_discovery_sensor(name, unique_id, value_template,
@@ -101,16 +110,16 @@ def publish_discovery_number(name, unique_id, command_topic, state_template,
 # Coil mapping (coil 13 omitted)
 coil_names = {
     0: "Soft starter Compressor",
-    1: "3-vay shunt VV open/close",
+    1: "3-Way shunt VV open/close",
     2: "Start/stop expansion valve",
     3: "Heating element",
     4: "Circ. pump warm side",
     5: "El-tracing CV/drain",
-    8: "4-vay valve defrost",
-    9: "liquid injection solenoid valve",
+    8: "4-way valve defrost",
+    9: "Liquid injection solenoid valve",
     10: "3-way shunt CV open",
     11: "3-way shunt CV close",
-    12: "Circ. pumpe CV",
+    12: "Circ. pump CV",
     14: "Sum alarm failure"
 }
 
@@ -140,7 +149,7 @@ def read_coils():
         bitmask = (response[2] << 8) | response[1]
         bits = [(bitmask >> i) & 1 for i in range(16)]
 
-        return {coil_names[i]: bits[i] for i in coil_names}
+        return dict(sorted({coil_names[i]: bits[i] for i in coil_names}.items()))
     except Exception as e:
         print(f"FC01 read failed: {e}")
         return {}
@@ -189,8 +198,6 @@ def on_message(client, userdata, msg):
         print(f"❌ Command handling failed for {msg.topic}: {e}")
 
 mqtt_client.on_message = on_message
-for t in command_map:
-    mqtt_client.subscribe(t)
 
 # Timers and persistent cache
 last_coil_update = 0
@@ -202,90 +209,8 @@ last_inputs = {}
 last_writes = {}
 last_published = None
 
-# --- Auto-discovery publishing ---
-# Coils -> binary_sensors
-for idx, coil_name in coil_names.items():
-    uid = f"dvi_lv12_coil_{idx}"
-    publish_discovery_binary(coil_name, uid, coil_name, device_class="power")
-
-# FC04 input registers -> sensors
-for key, label in fc04_labels.items():
-    uid = f"dvi_lv12_{key}"
-    publish_discovery_sensor(
-        name=label,
-        unique_id=uid,
-        value_template=f"{{{{ value_json.input_registers['{label}'] | float }}}}",
-        unit="°C",
-        device_class="temperature",
-        state_class="measurement"
-    )
-
-# EM23 extras
-publish_discovery_sensor(
-    "EM23 Power", "dvi_lv12_em23_power",
-    "{{ value_json.input_registers['em23_power'] | float }}",
-    unit="kW", device_class="power", state_class="measurement"
-)
-publish_discovery_sensor(
-    "EM23 Energy", "dvi_lv12_em23_energy",
-    "{{ value_json.input_registers['em23_energy'] | float }}",
-    unit="kWh", device_class="energy", state_class="total_increasing"
-)
-
-# FC06 dummy reads -> sensors
-for reg, label in {
-    0x01: "cv_mode",
-    0x02: "cv_curve",
-    0x03: "cv_setpoint",
-    0x04: "cv_night_setback",
-    0x0A: "vv_mode",
-    0x0B: "vv_setpoint",
-    0x0C: "vv_schedule",
-    0x0F: "aux_heating",
-    0xA1: "comp_hours",
-    0xA2: "vv_hours",
-    0xA3: "heating_hours",
-    0xD0: "curve_temp"
-}.items():
-    uid = f"dvi_lv12_fc06_{label}"
-    publish_discovery_sensor(
-        name=label,
-        unique_id=uid,
-        value_template=f"{{{{ value_json.write_registers['{label}'] }}}}"
-    )
-
-# Command map -> numbers/selects
-for topic, cfg in command_map.items():
-    reg = cfg["register"]
-    label = topic.split("/")[-1]  # e.g. "vvstate"
-    uid = f"dvi_lv12_cmd_{label}"
-
-    # Simple heuristic: treat *_state as select, others as number
-    if label.endswith("state"):
-        config_topic = f"homeassistant/select/{uid}/config"
-        payload = {
-            "name": label,
-            "command_topic": topic,
-            "state_topic": "dvi/measurement",
-            "value_template": f"{{{{ value_json.write_registers['{label}'] }}}}",
-            "options": ["0", "1"],  # adjust if more states exist
-            "unique_id": uid,
-            "device": {
-                "name": "DVI LV12",
-                "identifiers": ["dvi_lv12"],
-                "manufacturer": "DVI",
-                "model": "LV12 Heatpump"
-            }
-        }
-        mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
-    else:
-        publish_discovery_number(
-            name=label,
-            unique_id=uid,
-            command_topic=topic,
-            state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-            min_val=0, max_val=100, step=1
-        )
+mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
+mqtt_client.loop_start()
 
 # Main loop
 while True:
@@ -371,5 +296,4 @@ while True:
 #        print("📡 Published:", json.dumps(full_payload, indent=2))
         last_published = full_payload
 
-    mqtt_client.loop()
     time.sleep(1)
