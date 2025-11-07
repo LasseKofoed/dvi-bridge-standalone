@@ -32,7 +32,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 # MQTT setup
 mqtt_client = mqtt.Client()
-client.reconnect_delay_set(min_delay=1, max_delay=120)
+mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
 mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
 
 def on_connect(client, userdata, flags, rc):
