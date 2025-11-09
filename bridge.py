@@ -9,8 +9,8 @@ import time
 import threading
 import warnings
 import logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+#logging.basicConfig(level=logging.DEBUG)
+#logger = logging.getLogger(__name__)
 
 load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -35,7 +35,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 # MQTT setup
 mqtt_client = mqtt.Client()
-mqtt_client.enable_logger(logger)
+##mqtt_client.enable_logger(logger)
 mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
 mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
 
@@ -47,7 +47,7 @@ def on_connect(client, userdata, flags, rc):
     else:
         print(f"❌ MQTT connection failed with code {rc}")
 
-mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
+#mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
 
 def publish_discovery_sensor(name, unique_id, value_template,
                              unit=None, device_class=None, state_class=None):
@@ -135,7 +135,7 @@ def publish_discovery_select(name, unique_id, command_topic, state_template, opt
     }
     msg = json.dumps(payload)
     mqtt_client.publish(config_topic, msg, retain=True)
-    print(f"[DISCOVERY] Select {name} -> {config_topic}: {msg}")
+#    print(f"[DISCOVERY] Select {name} -> {config_topic}: {msg}")
 
 # Coil mapping (coil 13 omitted)
 coil_names = {
@@ -203,14 +203,45 @@ def read_via_fc06(register):
         print(f"FC06 echo failed for 0x{register:02X}: {e}")
         return None
 
+def write_fc06(register, value):
+    payload = struct.pack('>HH', register, value)
+    try:
+        with modbus_lock:
+            instrument._perform_command(6, payload)  # Don't store or parse response
+        print(f"✅ FC06 write sent: reg={register}, value={value}")
+    except Exception as e:
+        print(f"❌ FC06 write failed: {e}")
+
 # --- MQTT command handling for Modbus writes ---
 command_map = {
-    "dvi/command/vvstate": {"register": 0x10A, "scale": 1},
-    "dvi/command/cvstate": {"register": 0x101, "scale": 1},
-    "dvi/command/cvcurve": {"register": 0x102, "scale": 1},
-    "dvi/command/vvsetpoint": {"register": 0x10B, "scale": 1},
-    "dvi/command/tvstate": {"register": 0x10F, "scale": 1},
+    "dvi/command/vvstate": {"register": 266, "scale": 1},
+    "dvi/command/cvstate": {"register": 257, "scale": 1},
+    "dvi/command/cvcurve": {"register": 258, "scale": 1},
+    "dvi/command/vvsetpoint": {"register": 267, "scale": 1},
+    "dvi/command/tvstate": {"register": 271, "scale": 1},
 }
+
+# Map string payloads from HA selects to numeric register values
+select_map = {
+    "dvi/command/cvstate": {"Off": 0, "On": 1},
+    "dvi/command/vvstate": {"Off": 0, "On": 1},   # adjust if you add "Timer"
+    "dvi/command/tvstate": {"Off": 0, "Automatic": 1, "On": 2},
+}
+
+#def on_message(client, userdata, msg):
+#    try:
+#        topic = msg.topic
+#        payload_str = msg.payload.decode().strip()
+#        cfg = command_map.get(topic)
+#        if not cfg:
+#            return
+#        value_raw = int(payload_str)
+#        scaled = value_raw * cfg.get("scale", 1)
+#        with modbus_lock:
+#            instrument.write_register(cfg["register"], scaled, 0, functioncode=6)
+#        print(f"✅ FC06 write: topic={topic} value={value_raw} reg=0x{cfg['register']:02X}")
+#    except Exception as e:
+#        print(f"❌ Command handling failed for {msg.topic}: {e}")
 
 def on_message(client, userdata, msg):
     try:
@@ -219,13 +250,27 @@ def on_message(client, userdata, msg):
         cfg = command_map.get(topic)
         if not cfg:
             return
-        value_raw = int(payload_str)
+
+        # Handle HA Select payloads (e.g. "Off", "On", "Automatic")
+        if topic in select_map:
+            if payload_str not in select_map[topic]:
+                print(f"⚠️ Unknown select option '{payload_str}' for topic {topic}")
+                return
+            value_raw = select_map[topic][payload_str]
+        else:
+            value_raw = int(payload_str)
+
         scaled = value_raw * cfg.get("scale", 1)
-        with modbus_lock:
-            instrument.write_register(cfg["register"], scaled, 0, functioncode=6)
- #       print(f"✅ FC06 write: topic={topic} value={value_raw} reg=0x{cfg['register']:02X}")
+        print(f"Writing to register {cfg['register']} with value {scaled}")
+        write_fc06(cfg["register"], scaled)
+        print(f"✅ FC06 write: topic={topic} value={value_raw} reg=0x{cfg['register']:02X}")
+
     except Exception as e:
         print(f"❌ Command handling failed for {msg.topic}: {e}")
+
+mqtt_client.on_connect = on_connect
+for t in command_map:
+    mqtt_client.subscribe(t)
 
 mqtt_client.on_message = on_message
 
@@ -267,8 +312,8 @@ for key, label in fc04_labels.items():
 publish_discovery_sensor(
     name="em23_power",
     unique_id="dvi_fc04_power",
-    value_template="{{ value_json.input_registers['em23_power'] }}",
-    unit="W",
+    value_template="{{ value_json.input_registers['em23_power'] | float | round(3) }}",
+    unit="kW",
     device_class="power",
     state_class="measurement"
 )
@@ -282,12 +327,6 @@ publish_discovery_sensor(
 )
 
 # --- FC06 registers discovery ---
-
-mode_options = {
-    "cv_mode": ["Off", "Heating", "Cooling"],
-    "vv_mode": ["Off", "Domestic Hot Water", "Heating"],
-    "aux_heating": ["Disabled", "Enabled"]
-}
 
 fc06_registers = {
     0x01: "cv_mode",
@@ -304,21 +343,36 @@ fc06_registers = {
     0xD0: "curve_temp"
 }
 
+# Define the valid options for each mode register
+mode_options = {
+    "cv_mode": ["Off", "On"],
+    "vv_mode": ["Off", "On", "Timer"],
+    "aux_heating": ["Off", "Automatic", "On"]
+}
+
 for reg, label in fc06_registers.items():
-    # Mode registers -> Selects
     if label in mode_options:
-        # Map to correct command topic from command_map
         cmd_topic = {
             "cv_mode": "dvi/command/cvstate",
             "vv_mode": "dvi/command/vvstate",
             "aux_heating": "dvi/command/tvstate"
         }[label]
 
+        # Build mapping dict for Jinja
+        mapping = {
+            "cv_mode": {0: "Off", 1: "On"},
+            "vv_mode": {0: "Off", 1: "On"},
+            "aux_heating": {0: "Off", 1: "Automatic", 2: "On"}
+        }[label]
+
         publish_discovery_select(
             name=label,
             unique_id=f"dvi_fc06_{label}",
             command_topic=cmd_topic,
-            state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+            state_template=f"""
+              {{% set map = {mapping} %}}
+              {{{{ map[value_json.write_registers['{label}']] }}}}
+            """,
             options=mode_options[label]
         )
 
@@ -346,8 +400,18 @@ for reg, label in fc06_registers.items():
             unit="°C"
         )
 
+    # Read-only FC06 sensors
+    elif label == "curve_temp":
+        publish_discovery_sensor(
+            name=label,
+            unique_id=f"dvi_fc06_{label}",
+            value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+            unit="°C",
+            device_class="temperature",
+            state_class="measurement"
+        )
+
     elif label == "cv_setpoint":
-        # Read-only -> Sensor
         publish_discovery_sensor(
             name=label,
             unique_id=f"dvi_fc06_{label}",
