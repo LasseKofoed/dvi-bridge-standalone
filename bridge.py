@@ -214,18 +214,22 @@ def write_fc06(register, value):
 
 # --- MQTT command handling for Modbus writes ---
 command_map = {
-    "dvi/command/vvstate": {"register": 266, "scale": 1},
-    "dvi/command/cvstate": {"register": 257, "scale": 1},
-    "dvi/command/cvcurve": {"register": 258, "scale": 1},
-    "dvi/command/vvsetpoint": {"register": 267, "scale": 1},
-    "dvi/command/tvstate": {"register": 271, "scale": 1},
+    "dvi/command/cvstate": {"register": 0x101, "scale": 1},
+    "dvi/command/cvcurve": {"register": 0x102, "scale": 1},
+    "dvi/command/cvnight": {"register": 0x104, "scale": 1},
+    "dvi/command/vvstate": {"register": 0x10A, "scale": 1},
+    "dvi/command/vvsetpoint": {"register": 0x10B, "scale": 1},
+    "dvi/command/vvschedule": {"register": 0x10C, "scale": 1},
+    "dvi/command/tvstate": {"register": 0x10F, "scale": 1},
 }
 
 # Map string payloads from HA selects to numeric register values
 select_map = {
     "dvi/command/cvstate": {"Off": 0, "On": 1},
-    "dvi/command/vvstate": {"Off": 0, "On": 1},   # adjust if you add "Timer"
-    "dvi/command/tvstate": {"Off": 0, "Automatic": 1, "On": 2},
+    "dvi/command/vvstate": {"Off": 0, "On": 1},
+    "dvi/command/cvnight": {"Timer": 0, "Constant day": 1, "Constant night": 2},
+    "dvi/command/vvschedule": {"Timer": 0, "Constant on": 1, "Constant off": 2},
+    "dvi/command/tvstate": {"Off": 0, "Automatic": 1, "Backup operation": 2},
 }
 
 #def on_message(client, userdata, msg):
@@ -332,7 +336,7 @@ fc06_registers = {
     0x01: "cv_mode",
     0x02: "cv_curve",
     0x03: "cv_setpoint",
-    0x04: "cv_night_setback",
+    0x04: "cv_night",
     0x0A: "vv_mode",
     0x0B: "vv_setpoint",
     0x0C: "vv_schedule",
@@ -346,7 +350,9 @@ fc06_registers = {
 # Define the valid options for each mode register
 mode_options = {
     "cv_mode": ["Off", "On"],
+    "cv_night": ["Timer", "Constant day", "Constant night"],
     "vv_mode": ["Off", "On", "Timer"],
+    "vv_schedule": ["Timer", "Constant on", "Constant off"],
     "aux_heating": ["Off", "Automatic", "On"]
 }
 
@@ -354,14 +360,18 @@ for reg, label in fc06_registers.items():
     if label in mode_options:
         cmd_topic = {
             "cv_mode": "dvi/command/cvstate",
+            "cv_night": "dvi/command/cvnight",
             "vv_mode": "dvi/command/vvstate",
+            "vv_schedule": "dvi/command/vvschedule",
             "aux_heating": "dvi/command/tvstate"
         }[label]
 
         # Build mapping dict for Jinja
         mapping = {
             "cv_mode": {0: "Off", 1: "On"},
+            "cv_night": {0: "Timer", 1: "Constant day", 2: "Constant night"},
             "vv_mode": {0: "Off", 1: "On"},
+            "vv_schedule": {0: "Timer", 1: "Constant on", 2: "Constant off"},
             "aux_heating": {0: "Off", 1: "Automatic", 2: "On"}
         }[label]
 
@@ -475,7 +485,7 @@ while True:
             0x01: "cv_mode",
             0x02: "cv_curve",
             0x03: "cv_setpoint",
-            0x04: "cv_night_setback",
+            0x04: "cv_night",
             0x0A: "vv_mode",
             0x0B: "vv_setpoint",
             0x0C: "vv_schedule",
