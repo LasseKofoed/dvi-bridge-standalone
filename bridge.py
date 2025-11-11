@@ -347,6 +347,25 @@ fc06_registers = {
     0xD0: "curve_temp"
 }
 
+# Special FC06 sensor definitions
+special_fc06 = {
+    "comp_hours": {
+        "unit": "h",
+        "device_class": "duration",
+        "state_class": "total_increasing"
+    },
+    "vv_hours": {
+        "unit": "h",
+        "device_class": "duration",
+        "state_class": "total_increasing"
+    },
+    "heating_hours": {
+        "unit": "h",
+        "device_class": "duration",
+        "state_class": "total_increasing"
+    }
+}
+
 # Define the valid options for each mode register
 mode_options = {
     "cv_mode": ["Off", "On"],
@@ -429,6 +448,18 @@ for reg, label in fc06_registers.items():
             unit="°C",
             device_class="temperature",
             state_class="measurement"
+        )
+
+   # special case fc06  long term statestics sensors
+    elif label in special_fc06:
+        cfg = special_fc06[label]
+        publish_discovery_sensor(
+            name=label,
+            unique_id=f"dvi_fc06_{label}",
+            value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+            unit=cfg.get("unit"),
+            device_class=cfg.get("device_class"),
+            state_class=cfg.get("state_class")
         )
 
     # Read-only registers -> Sensors
