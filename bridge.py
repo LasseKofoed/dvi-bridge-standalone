@@ -184,10 +184,10 @@ def read_coils():
         print(f"FC01 read failed: {e}")
         return {}
 
-def read_input(register):
+def read_input(register, signed=False):
     try:
         with modbus_lock:
-            return instrument.read_register(register, number_of_decimals=0, functioncode=4)
+            return instrument.read_register(register, number_of_decimals=0, functioncode=4,signed=signed)
     except Exception as e:
         print(f"FC04 read failed for 0x{register:02X}: {e}")
         return None
@@ -486,7 +486,7 @@ while True:
     if now - last_fc04_update >= 17:
         fc04_raw = {}
         for reg in range(0x01, 0x0F):
-            val = read_input(reg)
+            val = read_input(reg,signed=True)
             if val is not None:
                 fc04_raw[f"sensor_{reg}"] = val
 
