@@ -6,29 +6,24 @@ on:
       - "v*"
 
 jobs:
-  build-zip:
+  build-release:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Create HACS ZIP
-      # tag name bliver fx v1.0.0 → vi laver en pæn fil-navn
+      - name: Create release ZIP for Lovelace card
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          ZIP_NAME="dvi-lv-x-heatpump-card-${VERSION}.zip"
-          zip -r "$ZIP_NAME" \
+          mkdir -p dist
+          # Lav en ZIP med KUN de filer HACS skal bruge til frontend
+          zip -r dist/dvi-lv-x-heatpump-card.zip \
             dvi-lv-x-heatpump-card.js \
-            dvi-lv-x \
-            README.md \
-            LICENSE \
-            hacs.json
-          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+            dvi-lv-x/
 
-      - name: Upload release asset
+      - name: Upload ZIP as release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP_NAME }}
+          files: dist/dvi-lv-x-heatpump-card.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

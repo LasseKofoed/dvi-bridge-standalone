@@ -13,7 +13,7 @@ The repository is designed so both parts can live in the same project (bridge + 
 
 ### Prerequisites
 
-- Raspberry Pi OS Lite (64‑bit)
+- Raspberry Pi OS Lite (64‑bit) – when you install, **set the default username to `dviha`** to match the paths and examples in this guide.
 - USB connection to DVI LV‑X heatpump
 - MQTT broker (e.g. the Mosquitto broker add‑on in Home Assistant)
 - Git + Python 3.9+ on the Pi
@@ -29,12 +29,10 @@ sudo apt install -y git python3 python3-pip python3-venv
 ### 2. Clone the repository
 
 ```bash
-cd /home/<user>
+cd /home/dviha
 git clone https://github.com/<your-org-or-user>/dvi-bridge-standalone.git
 cd dvi-bridge-standalone
 ```
-
-Replace `<user>` with your Linux username on the Pi (for example `zznetwork`).
 
 ### 3. Create the Python virtual environment
 
@@ -65,32 +63,7 @@ MQTT_PASS=
 
 Leave `MQTT_USER` / `MQTT_PASS` empty if your broker does not require authentication.
 
-### 5. Serial port detection
-
-The bridge uses `minimalmodbus` and can be configured to **auto‑detect** the correct USB serial device by scanning `/dev/serial/by-id/` for an `STM32_Virtual_COM_Port` entry.
-
-In `bridge.py` you will find code like:
-
-```python
-import glob
-
-SERIAL_GLOB = "/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_COM_Port_*"
-
-def find_serial_port():
-    ports = glob.glob(SERIAL_GLOB)
-    if not ports:
-        raise RuntimeError("No STM32 Virtual COM Port found under /dev/serial/by-id")
-    # If there are multiple, just pick the first; adjust if needed
-    return sorted(ports)[0]
-
-serial_port = find_serial_port()
-
-instrument = minimalmodbus.Instrument(serial_port, 0x10)
-```
-
-This means you normally do **not** need to hardcode the full device path; as long as the USB adapter exposes itself as `STM32 Virtual COM Port`, the bridge will find it automatically.
-
-### 6. Test the bridge manually
+### 5. Test the bridge manually
 
 ```bash
 source .venv/bin/activate
@@ -129,18 +102,18 @@ After=network.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/home/<user>/dvi-bridge-standalone/.venv/bin/python /home/<user>/dvi-bridge-standalone/bridge.py
-WorkingDirectory=/home/<user>/dvi-bridge-standalone
+ExecStart=/home/dviha/dvi-bridge-standalone/.venv/bin/python /home/dviha/dvi-bridge-standalone/bridge.py
+WorkingDirectory=/home/dviha/dvi-bridge-standalone
 Restart=always
-EnvironmentFile=/home/<user>/dvi-bridge-standalone/.env
-User=<user>
-Group=<user>
+EnvironmentFile=/home/dviha/dvi-bridge-standalone/.env
+User=dviha
+Group=dviha
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Again, replace `<user>` with your Pi username (e.g. `zznetwork`).
+If you chose a different username than `dviha` when installing Raspberry Pi OS, remember to update the username in all the paths and examples in this guide.
 
 Reload systemd and enable the service:
 
