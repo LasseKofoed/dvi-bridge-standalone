@@ -46,23 +46,8 @@ Example:
     MQTT_USER=
     MQTT_PASS=
 
-## 5. Find DVI USB serial device
 
-``` bash
-ls /dev/serial/by-id/
-```
-
-Use the full path shown in your system.
-
-## 6. Update serial port in `bridge.py`
-
-Edit the Modbus initialization line:
-
-``` python
-instrument = minimalmodbus.Instrument('/dev/serial/by-id/your-device-if00', 0x10)
-```
-
-## 7. Test manually
+## 5. Test manually
 
 ``` bash
 source .venv/bin/activate
@@ -73,7 +58,7 @@ You should see:
 
     Connected to MQTT broker
 
-## 8. Install systemd service
+## 6. Install systemd service
 
 ``` bash
 sudo cp systemd/bridge.service.example /etc/systemd/system/bridge.service
@@ -106,6 +91,6 @@ sudo systemctl enable bridge.service
 sudo systemctl start bridge.service
 ```
 
-## 9. Verify in Home Assistant
+## 7. Verify in Home Assistant
 
 Home Assistant should auto-discover the device under MQTT devices.
