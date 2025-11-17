@@ -173,207 +173,120 @@ As long as MQTT discovery is enabled in Home Assistant, all entities will appear
 
 ---
 
-## C. DVI LV‑X Heatpump Lovelace Card
+## C. 
 
-The **DVI LV‑X Heatpump card** is a custom Lovelace card that shows:
+# DVI LV‑X Heatpump Lovelace Card
 
-- A schematic diagram of the LV‑X unit (using animated GIF overlays)
-- Live temperatures (flow/return, buffer tanks, evaporator, HP/LP, outdoor)
-- Status icons for compressor, circulation pump and defrost
-- A **mode bar** with:
-  - Central heating (CV) mode + night mode indicator (sun/moon/clock)
-  - Hot water (VV) mode + schedule indicator
-  - AUX / electric heater state indicator
-  - Info chip with current EM23 power
-- Inline controls to:
-  - Turn CV / VV ON or OFF
-  - Change CV night mode (Timer / Constant day / Constant night)
-  - Change AUX heating mode (Off / Automatic / On)
-  - Adjust VV setpoint (+/– 1°C)
+The **DVI LV‑X Heatpump card** provides a full visual diagram of your LV‑X heatpump, live temperatures, compressor/pump status, mode controls, animated overlays, and popup panels for detailed settings.
 
-### 1. File layout in Home Assistant
-
-On your Home Assistant instance, place the files like this (inside your config directory):
-
-```text
-config/
-  www/
-    dvi-lv-x/
-      dvi-lv-x-heatpump-card.js
-      dvi.gif
-      CV_on.gif
-      CVflow_on.gif
-      HP_on.gif
-      COMP_on.gif
-      (any other image assets)
-```
-
-> Note: The `/local/` path in Lovelace corresponds to `config/www/` on disk.
-
-### 2. Add the Lovelace resource
-
-Go to **Settings → Dashboards → (three dots) → Resources** and add a new resource:
-
-- **URL:** `/local/dvi-lv-x/dvi-lv-x-heatpump-card.js`
-- **Resource type:** `JavaScript Module`
-
-Alternatively, if you manage Lovelace in YAML, add:
-
-```yaml
-resources:
-  - url: /local/dvi-lv-x/dvi-lv-x-heatpump-card.js
-    type: module
-```
-
-Restart Home Assistant or reload resources if needed.
-
-### 3. Install and configure `browser_mod` (for popups)
-
-The card can show **nice popups** (entities list) when you click the mode chips at the top. This is done via the [`browser_mod`](https://github.com/thomasloven/hass-browser_mod) integration.
-
-1. Install via HACS:
-   - Open **HACS → Integrations → Explore & download repositories**
-   - Search for **“browser_mod”**
-   - Install and restart Home Assistant
-2. Add minimal config in `configuration.yaml` if required:
-
-   ```yaml
-   browser_mod:
-   ```
-
-3. Clear your browser cache / reload the page.
-
-If `browser_mod` is not installed or not working, the card can still be used, but the popups will not open.
-
-### 4. Example Lovelace card configuration
-
-After the resource is added and the bridge is running, create a new Lovelace card (YAML) and use something like this:
-
-```yaml
-type: custom:dvi-lv-x-heatpump-card
-
-cv_mode: select.dvi_lv12_cv_mode
-vv_mode: select.dvi_lv12_vv_mode
-cv_night: select.dvi_lv12_cv_night
-vv_schedule: select.dvi_lv12_vv_schedule
-aux_heating: select.dvi_lv12_tv_state
-vv_setpoint: number.dvi_lv12_vv_setpoint
-
-outdoor_temp: sensor.dvi_lv12_outdoor
-curve_temp: sensor.dvi_lv12_curve_temp
-storage_tank_cv: sensor.dvi_lv12_storage_tank_cv
-storage_tank_vv: sensor.dvi_lv12_storage_tank_vv
-
-evaporator_temp: sensor.dvi_lv12_evaporator
-hp_temp: sensor.dvi_lv12_compressor_hp
-lp_temp: sensor.dvi_lv12_compressor_lp
-cv_forward_temp: sensor.dvi_lv12_cv_forward
-cv_return_temp: sensor.dvi_lv12_cv_return
-
-em23_power: sensor.dvi_lv12_em23_power
-em23_energy: sensor.dvi_lv12_em23_energy
-
-comp_icon: binary_sensor.dvi_lv12_soft_starter_compressor
-cv_pump_icon: binary_sensor.dvi_lv12_circ_pump_cv
-defrost_icon: binary_sensor.dvi_lv12_4_way_valve_defrost
-
-# Popup contents for the four chips in the mode bar:
-info_entities:
-  - sensor.dvi_lv12_em23_energy
-  - sensor.dvi_lv12_comp_hours
-  - sensor.dvi_lv12_vv_hours
-  - sensor.dvi_lv12_heating_hours
-
-cv_entities:
-  - select.dvi_lv12_cv_mode
-  - number.dvi_lv12_cv_curve
-  - select.dvi_lv12_tv_state
-  - select.dvi_lv12_cv_night
-
-vv_entities:
-  - number.dvi_lv12_vv_setpoint
-  - select.dvi_lv12_vv_mode
-  - input_select.varmtvandsur
-
-aux_entities:
-  - select.dvi_lv12_tv_state
-  - binary_sensor.dvi_lv12_heating_element
-```
-
-> Adjust entity IDs to match what your MQTT auto‑discovery created. The ones above follow a typical naming scheme based on the bridge configuration.
-
-### 5. Card behaviour summary
-
-- **Top “mode bar” chips:**
-  - **Info** – opens a popup with energy + runtime entities, shows current EM23 power in the chip.
-  - **CV** – colour reflects `cv_mode` and `cv_night` (sun / moon / clock).
-  - **VV** – colour and small icon reflect `vv_mode` and `vv_schedule`.
-  - **AUX** – shows status of the electric heater (dangerous/expensive mode).
-- **Diagram overlay:**
-  - Compressor + HP animated GIFs when the compressor coil is ON.
-  - CV pump + CV flow GIFs when the circulation pump coil is ON.
-  - Defrost snowflake icon with orange colour when defrost coil is ON.
-  - Temperatures are written directly on the diagram near the physical location.
-- **Bottom grid:**
-  - Shows key modes and temperatures.
-  - Provides direct buttons for:
-    - CV mode ON/OFF
-    - VV mode ON/OFF
-    - CV night mode (Timer / Day / Night)
-    - AUX heating mode (Off / Automatic / On)
-    - VV setpoint –/+ (updates via the corresponding `number` entity).
+It is fully compatible with HACS and includes a visual configuration editor.
 
 ---
 
-## D. HACS Distribution (Frontend Card)
+## 🔧 Install via HACS
 
-This project is prepared for HACS as a **frontend** custom repository. The `hacs.json` file in the root declares:
+### 1. Open HACS  
+Home Assistant → **HACS** → *Frontend* → ⋮ (menu) → **Custom repositories**
 
-```json
-{
-  "name": "LV12 Heatpump Card",
-  "content_in_root": true,
-  "render_readme": true
-}
+### 2. Add the repository  
+- **URL:**  
+  `https://github.com/LasseKofoed/dvi-bridge-standalone`
+- **Category:** `Dashboard`
+
+Click **Add**.
+
+### 3. Install the card  
+Go to **HACS → Frontend**, find:
+
+**“DVI LV‑X Heatpump Card”**
+
+Click **Download**.  
+HACS installs everything automatically into:
+
+```
+/config/www/community/dvi-bridge-standalone/
 ```
 
-With this structure (bridge + card in one repo):
-
-```text
-dvi-bridge-standalone/
-  bridge.py
-  systemd/
-  .env.example
-  ...
-  dvi-lv-x-heatpump-card.js
-  dvi-lv-x/
-    dvi.gif
-    CV_on.gif
-    CVflow_on.gif
-    HP_on.gif
-    COMP_on.gif
-  README.md   (this file)
-  hacs.json
-```
-
-you can:
-
-1. Publish the repository on GitHub.
-2. In Home Assistant → HACS → Frontend → **Custom repositories**, add:
-   - **URL:** your GitHub repo URL
-   - **Category:** `Lovelace`
-3. Install **“LV12 Heatpump Card”** from HACS and HACS will place the JS file under `/www/community/...` for you.
-
-When using HACS, the Lovelace resource URL will typically be something like:
-
-```yaml
-- url: /hacsfiles/lv12-heatpump-card/dvi-lv-x-heatpump-card.js
-  type: module
-```
-
-(The exact path depends on the repository name and HACS slug.)
+### 4. Reload browser  
+Press **Ctrl+F5** (or full refresh on mobile) to ensure the new card files load.
 
 ---
+
+## 🧩 Adding the card in Lovelace
+
+1. Open any dashboard  
+2. Click **Edit dashboard**  
+3. Click **Add card**  
+4. Select **DVI LV‑X Heatpump Card**
+
+A full configuration UI appears.  
+From here you can visually pick all entities discovered via MQTT:
+
+- CV mode  
+- VV mode  
+- CV night mode  
+- VV schedule  
+- AUX mode  
+- All temperature sensors  
+- Pump/compressor/defrost binary sensors  
+- Entities shown in the popup panels (Info / CV / VV / AUX)
+
+No YAML needed — unless you prefer YAML manually.
+
+---
+
+## 📘 Requirements
+
+### Optional (recommended)
+**browser_mod** (installed from HACS)  
+Enables beautiful popup panels when clicking the top mode chips.
+
+Add to configuration if required:
+
+```yaml
+browser_mod:
+```
+
+---
+
+## 🎨 Features
+
+- Animated LV‑X heating circuit diagram  
+- Real‑time temperatures drawn directly in the diagram  
+- Live compressor, CV pump and defrost icons  
+- Mode bar with:
+  - CV mode + sun/moon/clock based on night mode  
+  - VV mode + schedule indicator  
+  - AUX heating status  
+  - Info chip showing EM23 power  
+- Popups for Info, CV, VV, AUX  
+- Buttons for:
+  - CV/VV ON/OFF  
+  - CV night mode (Timer / Day / Night)  
+  - AUX modes (Off / Auto / On)  
+  - VV setpoint ±1°C  
+- Fully HACS‑compatible asset loading (JS + images auto‑loaded)
+
+---
+
+## 🛠 Troubleshooting
+
+**Card does not appear in Add Card menu?**  
+- Clear cache (Ctrl+F5)  
+- Check **Settings → Dashboards → Resources**
+
+**Popups not opening?**  
+- Install `browser_mod`  
+- Restart Home Assistant
+
+**Entity not found?**  
+- Check MQTT entity names: *Settings → Devices & Services → MQTT*
+
+---
+
+## 📄 License
+MIT License
+
 
 ## E. Energy Dashboard (optional)
 
