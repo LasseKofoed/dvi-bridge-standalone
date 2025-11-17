@@ -43,8 +43,9 @@ Example:
 
     MQTT_HOST=192.168.x.xxx
     MQTT_PORT=1883
-    MQTT_USER=
-    MQTT_PASS=
+    MQTT_USER=xxxxxxxxx
+    MQTT_PASS=yyyyyyyyy
+    HEATPUMP_MODEL=LVx #replace with your specific model
 
 
 ## 5. Test manually

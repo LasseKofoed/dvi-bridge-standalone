@@ -41,6 +41,11 @@ MQTT_PASS = os.getenv("MQTT_PASS", "default_pass")
 MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
+# Get heatpump model from environment variable
+HEATPUMP_MODEL = os.getenv("HEATPUMP_MODEL", "LVx")
+if HEATPUMP_MODEL == "LVx":
+    print("⚠️ HEATPUMP_MODEL not set in .env, using placeholder LVx")
+
 # MQTT setup
 mqtt_client = mqtt.Client()
 ##mqtt_client.enable_logger(logger)
@@ -66,11 +71,12 @@ def publish_discovery_sensor(name, unique_id, value_template,
         "value_template": value_template,
         "unique_id": unique_id,
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         }
+
     }
     if unit: payload["unit_of_measurement"] = unit
     if device_class: payload["device_class"] = device_class
@@ -94,10 +100,10 @@ def publish_discovery_binary(name, unique_id, coil_key, device_class=None):
         "value_template": value_template,
         "unique_id": unique_id,
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         },
         "entity_category": "diagnostic"
     }
@@ -118,10 +124,10 @@ def publish_discovery_number(name, unique_id, command_topic, state_template,
         "step": step,
         "mode": "box",
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         }
     }
     if unit: payload["unit_of_measurement"] = unit
@@ -138,10 +144,10 @@ def publish_discovery_select(name, unique_id, command_topic, state_template, opt
         "unique_id": unique_id,
         "options": options,
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         }
     }
     msg = json.dumps(payload)
