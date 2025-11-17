@@ -50,7 +50,7 @@ def on_connect(client, userdata, flags, rc):
 #mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
 
 def publish_discovery_sensor(name, unique_id, value_template,
-                             unit=None, device_class=None, state_class=None):
+                             unit=None, device_class=None, entity_category=None, state_class=None):
     config_topic = f"homeassistant/sensor/{unique_id}/config"
     payload = {
         "name": name,
@@ -67,6 +67,7 @@ def publish_discovery_sensor(name, unique_id, value_template,
     if unit: payload["unit_of_measurement"] = unit
     if device_class: payload["device_class"] = device_class
     if state_class: payload["state_class"] = state_class
+    if entity_category: payload["entity_category"] = entity_category
 #    mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
     msg = json.dumps(payload)
     mqtt_client.publish(config_topic, msg, retain=True)
@@ -89,13 +90,14 @@ def publish_discovery_binary(name, unique_id, coil_key, device_class=None):
             "identifiers": ["dvi_lv12"],
             "manufacturer": "DVI",
             "model": "LV12 Heatpump"
-        }
+        },
+        "entity_category": "diagnostic"
     }
     if device_class: payload["device_class"] = device_class
     mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
 
 def publish_discovery_number(name, unique_id, command_topic, state_template,
-                             min_val=0, max_val=100, step=1, unit=None):
+                             min_val=0, max_val=100, step=1, unit=None, entity_category=None):
     config_topic = f"homeassistant/number/{unique_id}/config"
     payload = {
         "name": name,
@@ -115,6 +117,7 @@ def publish_discovery_number(name, unique_id, command_topic, state_template,
         }
     }
     if unit: payload["unit_of_measurement"] = unit
+    if entity_category: payload["entity_category"] = entity_category
     mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
 
 def publish_discovery_select(name, unique_id, command_topic, state_template, options):
@@ -187,7 +190,7 @@ def read_coils():
 def read_input(register, signed=False):
     try:
         with modbus_lock:
-            return instrument.read_register(register, number_of_decimals=0, functioncode=4,signed=signed)
+            return instrument.read_register(register, number_of_decimals=0, functioncode=4, signed=signed)
     except Exception as e:
         print(f"FC04 read failed for 0x{register:02X}: {e}")
         return None
@@ -221,31 +224,18 @@ command_map = {
     "dvi/command/vvsetpoint": {"register": 0x10B, "scale": 1},
     "dvi/command/vvschedule": {"register": 0x10C, "scale": 1},
     "dvi/command/tvstate": {"register": 0x10F, "scale": 1},
+    "dvi/command/curveset-12": {"register": 0x133, "scale": 1},
+    "dvi/command/curveset12": {"register": 0x134, "scale": 1},
 }
 
 # Map string payloads from HA selects to numeric register values
 select_map = {
     "dvi/command/cvstate": {"Off": 0, "On": 1},
-    "dvi/command/vvstate": {"Off": 0, "On": 1},
+    "dvi/command/vvstate": {"Off": 0, "On": 1},   # adjust if you add "Timer"
     "dvi/command/cvnight": {"Timer": 0, "Constant day": 1, "Constant night": 2},
     "dvi/command/vvschedule": {"Timer": 0, "Constant on": 1, "Constant off": 2},
     "dvi/command/tvstate": {"Off": 0, "Automatic": 1, "Backup operation": 2},
 }
-
-#def on_message(client, userdata, msg):
-#    try:
-#        topic = msg.topic
-#        payload_str = msg.payload.decode().strip()
-#        cfg = command_map.get(topic)
-#        if not cfg:
-#            return
-#        value_raw = int(payload_str)
-#        scaled = value_raw * cfg.get("scale", 1)
-#        with modbus_lock:
-#            instrument.write_register(cfg["register"], scaled, 0, functioncode=6)
-#        print(f"✅ FC06 write: topic={topic} value={value_raw} reg=0x{cfg['register']:02X}")
-#    except Exception as e:
-#        print(f"❌ Command handling failed for {msg.topic}: {e}")
 
 def on_message(client, userdata, msg):
     try:
@@ -341,6 +331,8 @@ fc06_registers = {
     0x0B: "vv_setpoint",
     0x0C: "vv_schedule",
     0x0F: "aux_heating",
+    0x33: "curve_set_-12",   # <-- add here
+    0x34: "curve_set_12",    # <-- add here
     0xA1: "comp_hours",
     0xA2: "vv_hours",
     0xA3: "heating_hours",
@@ -429,6 +421,32 @@ for reg, label in fc06_registers.items():
             unit="°C"
         )
 
+    elif label == "curve_set_-12":
+        publish_discovery_number(
+            name=label,
+            unique_id=f"dvi_fc06_{label}",
+            command_topic="dvi/command/curveset-12",
+            state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+            min_val=10,
+            max_val=80,
+            step=1,
+            unit="°C",
+            entity_category="config"
+        )
+
+    elif label == "curve_set_12":
+        publish_discovery_number(
+            name=label,
+            unique_id=f"dvi_fc06_{label}",
+            command_topic="dvi/command/curveset12",
+            state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+            min_val=10,
+            max_val=80,
+            step=1,
+            unit="°C",
+            entity_category="config"
+        )
+
     # Read-only FC06 sensors
     elif label == "curve_temp":
         publish_discovery_sensor(
@@ -486,7 +504,7 @@ while True:
     if now - last_fc04_update >= 17:
         fc04_raw = {}
         for reg in range(0x01, 0x0F):
-            val = read_input(reg,signed=True)
+            val = read_input(reg, signed=True)
             if val is not None:
                 fc04_raw[f"sensor_{reg}"] = val
 
@@ -521,6 +539,8 @@ while True:
             0x0B: "vv_setpoint",
             0x0C: "vv_schedule",
             0x0F: "aux_heating",
+            0x33: "curve_set_-12",
+            0x34: "curve_set_12",
             0xA1: "comp_hours",
             0xA2: "vv_hours",
             0xA3: "heating_hours",
