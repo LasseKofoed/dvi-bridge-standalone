@@ -1,0 +1,34 @@
+name: Build HACS ZIP
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create HACS ZIP
+      # tag name bliver fx v1.0.0 → vi laver en pæn fil-navn
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          ZIP_NAME="dvi-lv-x-heatpump-card-${VERSION}.zip"
+          zip -r "$ZIP_NAME" \
+            dvi-lv-x-heatpump-card.js \
+            dvi-lv-x \
+            README.md \
+            LICENSE \
+            hacs.json
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

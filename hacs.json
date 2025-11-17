@@ -1,5 +1,8 @@
 {
-  "name": "DVI LV x Heatpump Card",
-  "content_in_root": true,
-  "render_readme": true
+  "name": "DVI LV-X Heatpump Card",
+  "filename": "dvi-lv-x-heatpump-card.js",
+  "render_readme": true,
+  "hide_default_branch": false,
+  "homeassistant": "2024.1.0",
+  "zip_release": true
 }
