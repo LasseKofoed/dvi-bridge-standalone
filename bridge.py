@@ -9,15 +9,23 @@ import time
 import threading
 import warnings
 import logging
+import glob
+
 #logging.basicConfig(level=logging.DEBUG)
 #logger = logging.getLogger(__name__)
+
+# Find STM32 Virtual COM Port automatically
+devices = glob.glob("/dev/serial/by-id/*STM32*")
+
+if not devices:
+    raise RuntimeError("STM32 Virtual COM Port not found!")
+serial_port = devices[0] 
 
 load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Modbus setup
-instrument = minimalmodbus.Instrument(
-    '/dev/serial/by-id/usb-STMicroelectronics_STM32_Virtual_COM_Port_48D874673036-if00', 0x10)
+instrument = minimalmodbus.Instrument(serial_port, 0x10)
 instrument.serial.baudrate = 9600
 instrument.serial.bytesize = 8
 instrument.serial.parity = minimalmodbus.serial.PARITY_NONE
