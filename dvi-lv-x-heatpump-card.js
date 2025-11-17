@@ -579,16 +579,291 @@ class Lv12HeatpumpCard extends HTMLElement {
     bindNumberDelta("vv_set_inc", cfg.vv_setpoint, +1);
   }
 
+  // static getConfigElement() {
+  //   return document.createElement("hui-text-config-editor");
+  // }
+
   static getConfigElement() {
-    return document.createElement("hui-text-config-editor");
+    return document.createElement("lv12-heatpump-card-editor");
   }
 
-  static getStubConfig() {
+    static getStubConfig(hass, entities) {
+    // Default config used when you add the card from the UI
     return {
+      type: "custom:lv12-heatpump-card",
+
       cv_mode: "select.dvi_lv12_cv_mode",
       vv_mode: "select.dvi_lv12_vv_mode",
+      cv_night: "select.dvi_lv12_cv_night",
+      vv_schedule: "select.dvi_lv12_vv_schedule",
+      aux_heating: "select.dvi_lv12_aux_heating",
+      vv_setpoint: "number.dvi_lv12_vv_setpoint",
+
+      outdoor_temp: "sensor.dvi_lv12_outdoor",
+      curve_temp: "sensor.dvi_lv12_curve_temp",
+      storage_tank_cv: "sensor.dvi_lv12_storage_tank_cv",
+      storage_tank_vv: "sensor.dvi_lv12_storage_tank_vv",
+      evaporator_temp: "sensor.dvi_lv12_evaporator",
+      hp_temp: "sensor.dvi_lv12_compressor_hp",
+      lp_temp: "sensor.dvi_lv12_compressor_lp",
+      cv_forward_temp: "sensor.dvi_lv12_cv_forward",
+      cv_return_temp: "sensor.dvi_lv12_cv_return",
+      em23_power: "sensor.dvi_lv12_em23_power",
+      em23_energy: "sensor.dvi_lv12_em23_energy",
+
+      comp_icon: "binary_sensor.dvi_lv12_soft_starter_compressor",
+      cv_pump_icon: "binary_sensor.dvi_lv12_circ_pump_cv",
+      defrost_icon: "binary_sensor.dvi_lv12_4_way_valve_defrost",
+
+      info_entities: [
+        "sensor.dvi_lv12_em23_energy",
+        "sensor.dvi_lv12_comp_hours",
+        "sensor.dvi_lv12_vv_hours",
+        "sensor.dvi_lv12_heating_hours"
+      ],
+      cv_entities: [
+        "select.dvi_lv12_cv_mode",
+        "number.dvi_lv12_cv_curve",
+        "select.dvi_lv12_aux_heating",
+        "select.dvi_lv12_cv_night"
+      ],
+      vv_entities: [
+        "number.dvi_lv12_vv_setpoint",
+        "select.dvi_lv12_vv_mode",
+        "select.dvi_lv12_vv_schedule"
+      ],
+      aux_entities: [
+        "select.dvi_lv12_aux_heating",
+        "sensor.dvi_lv12_heating_hours"
+      ]
     };
   }
+
 }
+
+class Lv12HeatpumpCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this._config = {};
+    this._schema = [];
+    this._hass = null;
+    this._form = null;
+  }
+
+  setConfig(config) {
+    this._config = config || {};
+    this._buildSchema();
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._form) {
+      this._form.hass = hass;
+    }
+  }
+
+  _buildSchema() {
+    if (this._schema && this._schema.length) return;
+
+    this._schema = [
+      // --- Core modes / selects ---
+      {
+        name: "cv_mode",
+        label: "CV mode select entity",
+        selector: { entity: { domain: "select" } },
+      },
+      {
+        name: "vv_mode",
+        label: "VV mode select entity",
+        selector: { entity: { domain: "select" } },
+      },
+      {
+        name: "cv_night",
+        label: "CV night mode select entity",
+        selector: { entity: { domain: "select" } },
+      },
+      {
+        name: "vv_schedule",
+        label: "VV schedule select entity",
+        selector: { entity: { domain: "select" } },
+      },
+      {
+        name: "aux_heating",
+        label: "Aux heating select entity",
+        selector: { entity: { domain: "select" } },
+      },
+      {
+        name: "vv_setpoint",
+        label: "VV setpoint number/input_number entity",
+        selector: { entity: { domain: ["number", "input_number"] } },
+      },
+
+      // --- Temperatures / sensors ---
+      {
+        name: "outdoor_temp",
+        label: "Outdoor temperature sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "curve_temp",
+        label: "Curve temperature sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "storage_tank_cv",
+        label: "Storage tank CV sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "storage_tank_vv",
+        label: "Storage tank VV sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "evaporator_temp",
+        label: "Evaporator temperature sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "hp_temp",
+        label: "High pressure temperature sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "lp_temp",
+        label: "Low pressure temperature sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "cv_forward_temp",
+        label: "CV forward temperature sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "cv_return_temp",
+        label: "CV return temperature sensor",
+        selector: { entity: { domain: "sensor" } },
+      },
+
+      // --- Energy / power ---
+      {
+        name: "em23_power",
+        label: "EM23 power sensor (kW)",
+        selector: { entity: { domain: "sensor" } },
+      },
+      {
+        name: "em23_energy",
+        label: "EM23 energy sensor (kWh)",
+        selector: { entity: { domain: "sensor" } },
+      },
+
+      // --- Binary sensor icons / states ---
+      {
+        name: "comp_icon",
+        label: "Compressor state (binary_sensor)",
+        selector: { entity: { domain: "binary_sensor" } },
+      },
+      {
+        name: "cv_pump_icon",
+        label: "CV pump state (binary_sensor)",
+        selector: { entity: { domain: "binary_sensor" } },
+      },
+      {
+        name: "defrost_icon",
+        label: "Defrost state (binary_sensor)",
+        selector: { entity: { domain: "binary_sensor" } },
+      },
+
+      // --- Popup entity lists ---
+      {
+        name: "info_entities",
+        label: "Info popup entities",
+        selector: {
+          entity: {
+            multiple: true,
+          },
+        },
+      },
+      {
+        name: "cv_entities",
+        label: "CV popup entities",
+        selector: {
+          entity: {
+            multiple: true,
+          },
+        },
+      },
+      {
+        name: "vv_entities",
+        label: "VV popup entities",
+        selector: {
+          entity: {
+            multiple: true,
+          },
+        },
+      },
+      {
+        name: "aux_entities",
+        label: "Aux popup entities",
+        selector: {
+          entity: {
+            multiple: true,
+          },
+        },
+      },
+    ];
+  }
+
+  _render() {
+    if (!this._hass) return;
+
+    // Ryd tidligere indhold
+    this.innerHTML = "";
+
+    const container = document.createElement("div");
+    container.className = "card-config";
+
+    const form = document.createElement("ha-form");
+    form.schema = this._schema;
+    form.data = this._config;
+    form.hass = this._hass;
+
+    form.addEventListener("value-changed", (ev) => {
+      // ha-form sender hele config i ev.detail.value
+      this._config = ev.detail.value || {};
+      this._dispatchConfigChanged();
+    });
+
+    container.appendChild(form);
+    this.appendChild(container);
+
+    this._form = form;
+  }
+
+  _dispatchConfigChanged() {
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+}
+
+
+customElements.define("lv12-heatpump-card-editor", Lv12HeatpumpCardEditor);
+
+
+// Register card in the Lovelace card picker
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "lv12-heatpump-card",
+  name: "DVI LV-X Heatpump Card",
+  description: "Visual overview and control panel for a DVI LV-X heatpump.",
+  preview: true,                 // gør at det dukker op under "Custom cards"
+  documentationURL: "https://github.com/ruteclrp/dvi-bridge-standalone"
+});
 
 customElements.define("lv12-heatpump-card", Lv12HeatpumpCard);
