@@ -17,13 +17,13 @@ jobs:
         run: |
           mkdir -p dist
           # Lav en ZIP med KUN de filer HACS skal bruge til frontend
-          zip -r dist/dvi-lv-x-heatpump-card.zip \
+          zip -r dist/dvi-lv-x-heatpump-card.js.zip \
             dvi-lv-x-heatpump-card.js \
             dvi-lv-x/
 
       - name: Upload ZIP as release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/dvi-lv-x-heatpump-card.zip
+          files: dist/dvi-lv-x-heatpump-card.js.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
