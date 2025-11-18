@@ -589,6 +589,7 @@ class Lv12HeatpumpCard extends HTMLElement {
  
      static getStubConfig(hass, entities) {
      // Default config used when you add the card from the UI
+     return {};
      return {
        type: "custom:lv12-heatpump-card",
  
@@ -640,14 +641,15 @@ class Lv12HeatpumpCard extends HTMLElement {
    }
  
  }
- 
- class Lv12HeatpumpCardEditor extends HTMLElement {
+class Lv12HeatpumpCardEditor extends HTMLElement {
   constructor() {
     super();
     this._config = {};
-    this._schema = [];
     this._hass = null;
-    this._form = null;
+    this._formBasic = null;
+    this._formAdvanced = null;
+    this._basicSchema = [];
+    this._advancedSchema = [];
   }
 
   setConfig(config) {
@@ -658,187 +660,334 @@ class Lv12HeatpumpCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    if (this._form) {
-      this._form.hass = hass;
-    }
+    if (this._formBasic) this._formBasic.hass = hass;
+    if (this._formAdvanced) this._formAdvanced.hass = hass;
   }
 
   _buildSchema() {
-    if (this._schema && this._schema.length) return;
-
-    this._schema = [
-      // --- Core modes / selects ---
+    // Basic: kun device
+    this._basicSchema = [
       {
-        name: "cv_mode",
-        label: "CV mode select entity",
-        selector: { entity: { domain: "select" } },
-      },
-      {
-        name: "vv_mode",
-        label: "VV mode select entity",
-        selector: { entity: { domain: "select" } },
-      },
-      {
-        name: "cv_night",
-        label: "CV night mode select entity",
-        selector: { entity: { domain: "select" } },
-      },
-      {
-        name: "vv_schedule",
-        label: "VV schedule select entity",
-        selector: { entity: { domain: "select" } },
-      },
-      {
-        name: "aux_heating",
-        label: "Aux heating select entity",
-        selector: { entity: { domain: "select" } },
-      },
-      {
-        name: "vv_setpoint",
-        label: "VV setpoint number/input_number entity",
-        selector: { entity: { domain: ["number", "input_number"] } },
-      },
-
-      // --- Temperatures / sensors ---
-      {
-        name: "outdoor_temp",
-        label: "Outdoor temperature sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "curve_temp",
-        label: "Curve temperature sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "storage_tank_cv",
-        label: "Storage tank CV sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "storage_tank_vv",
-        label: "Storage tank VV sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "evaporator_temp",
-        label: "Evaporator temperature sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "hp_temp",
-        label: "High pressure temperature sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "lp_temp",
-        label: "Low pressure temperature sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "cv_forward_temp",
-        label: "CV forward temperature sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "cv_return_temp",
-        label: "CV return temperature sensor",
-        selector: { entity: { domain: "sensor" } },
-      },
-
-      // --- Energy / power ---
-      {
-        name: "em23_power",
-        label: "EM23 power sensor (kW)",
-        selector: { entity: { domain: "sensor" } },
-      },
-      {
-        name: "em23_energy",
-        label: "EM23 energy sensor (kWh)",
-        selector: { entity: { domain: "sensor" } },
-      },
-
-      // --- Binary sensor icons / states ---
-      {
-        name: "comp_icon",
-        label: "Compressor state (binary_sensor)",
-        selector: { entity: { domain: "binary_sensor" } },
-      },
-      {
-        name: "cv_pump_icon",
-        label: "CV pump state (binary_sensor)",
-        selector: { entity: { domain: "binary_sensor" } },
-      },
-      {
-        name: "defrost_icon",
-        label: "Defrost state (binary_sensor)",
-        selector: { entity: { domain: "binary_sensor" } },
-      },
-
-      // --- Popup entity lists ---
-      {
-        name: "info_entities",
-        label: "Info popup entities",
+        name: "device_id",
+          label: "DVI LV12 MQTT device",
         selector: {
-          entity: {
-            multiple: true,
+          device: {
+            integration: "mqtt",
           },
         },
       },
-      {
-        name: "cv_entities",
-        label: "CV popup entities",
-        selector: {
-          entity: {
-            multiple: true,
-          },
+    ];
+
+    // Advanced: alle de gamle felter
+    this._advancedSchema = [
+     // --- Core modes / selects ---
+    {
+      name: "cv_mode",
+      label: "Central heating mode (cv_mode)",
+      selector: { entity: { domain: "select" } },
+    },
+    {
+      name: "vv_mode",
+      label: "Hot water mode (vv_mode)",
+      selector: { entity: { domain: "select" } },
+    },
+    {
+      name: "cv_night",
+      label: "CV night mode (cv_night)",
+      selector: { entity: { domain: "select" } },
+    },
+    {
+      name: "vv_schedule",
+      label: "VV schedule (vv_schedule)",
+      selector: { entity: { domain: "select" } },
+    },
+    {
+      name: "aux_heating",
+      label: "Aux / electric heater mode (aux_heating)",
+      selector: { entity: { domain: "select" } },
+    },
+    {
+      name: "vv_setpoint",
+      label: "Warm water setpoint (vv_setpoint)",
+      selector: { entity: { domain: ["number", "input_number"] } },
+    },
+
+    // --- Temperatures / sensors ---
+    {
+      name: "outdoor_temp",
+      label: "Outdoor temperature (outdoor_temp)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "curve_temp",
+      label: "Curve temperature (curve_temp)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "storage_tank_cv",
+      label: "Storage tank CV (storage_tank_cv)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "storage_tank_vv",
+      label: "Storage tank VV (storage_tank_vv)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "evaporator_temp",
+      label: "Evaporator temperature (evaporator_temp)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "hp_temp",
+      label: "High pressure temperature (hp_temp)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "lp_temp",
+      label: "Low pressure temperature (lp_temp)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "cv_forward_temp",
+      label: "CV forward temperature (cv_forward_temp)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "cv_return_temp",
+      label: "CV return temperature (cv_return_temp)",
+      selector: { entity: { domain: "sensor" } },
+    },
+
+    // --- Energy / power ---
+    {
+      name: "em23_power",
+      label: "EM23 power (em23_power)",
+      selector: { entity: { domain: "sensor" } },
+    },
+    {
+      name: "em23_energy",
+      label: "EM23 energy (em23_energy)",
+      selector: { entity: { domain: "sensor" } },
+    },
+
+    // --- Binary sensor icons / states ---
+    {
+      name: "comp_icon",
+      label: "Compressor state (comp_icon)",
+      selector: { entity: { domain: "binary_sensor" } },
+    },
+    {
+      name: "cv_pump_icon",
+      label: "CV pump state (cv_pump_icon)",
+      selector: { entity: { domain: "binary_sensor" } },
+    },
+    {
+      name: "defrost_icon",
+      label: "Defrost state (defrost_icon)",
+      selector: { entity: { domain: "binary_sensor" } },
+    },
+
+    // --- Popup entity lists ---
+    {
+      name: "info_entities",
+      label: "Info popup entities (info_entities)",
+      selector: {
+        entity: {
+          multiple: true,
         },
       },
-      {
-        name: "vv_entities",
-        label: "VV popup entities",
-        selector: {
-          entity: {
-            multiple: true,
-          },
+    },
+    {
+      name: "cv_entities",
+      label: "CV popup entities (cv_entities)",
+      selector: {
+        entity: {
+          multiple: true,
         },
       },
-      {
-        name: "aux_entities",
-        label: "Aux popup entities",
-        selector: {
-          entity: {
-            multiple: true,
-          },
+    },
+    {
+      name: "vv_entities",
+      label: "VV popup entities (vv_entities)",
+      selector: {
+        entity: {
+          multiple: true,
         },
       },
+    },
+    {
+      name: "aux_entities",
+      label: "Aux popup entities (aux_entities)",
+      selector: {
+        entity: {
+          multiple: true,
+        },
+      },
+    },
     ];
   }
 
   _render() {
     if (!this._hass) return;
 
-    // Ryd tidligere indhold
     this.innerHTML = "";
 
     const container = document.createElement("div");
     container.className = "card-config";
 
-    const form = document.createElement("ha-form");
-    form.schema = this._schema;
-    form.data = this._config;
-    form.hass = this._hass;
+    // --- BASIC FORM (device) ---
+    const basicForm = document.createElement("ha-form");
+    basicForm.schema = this._basicSchema;
+    basicForm.data = this._config;
+    basicForm.hass = this._hass;
 
-    form.addEventListener("value-changed", (ev) => {
-      // ha-form sender hele config i ev.detail.value
-      this._config = ev.detail.value || {};
+    basicForm.addEventListener("value-changed", (ev) => {
+      const oldDevice = this._config.device_id;
+      this._config = { ...this._config, ...ev.detail.value };
+      const newDevice = this._config.device_id;
+
+      if (newDevice && newDevice !== oldDevice) {
+        // hver gang device skifter, auto-map alle felter
+        this._autoFillFromDevice(newDevice);
+      }
+
       this._dispatchConfigChanged();
     });
 
-    container.appendChild(form);
+    container.appendChild(basicForm);
+    this._formBasic = basicForm;
+
+    // --- ADVANCED (fold-ud) ---
+    const details = document.createElement("details");
+    details.style.marginTop = "16px";
+
+    const summary = document.createElement("summary");
+    summary.textContent = "Advanced entity mapping";
+    summary.style.cursor = "pointer";
+    details.appendChild(summary);
+
+    const advWrapper = document.createElement("div");
+    advWrapper.style.marginTop = "8px";
+
+    const advForm = document.createElement("ha-form");
+    advForm.schema = this._advancedSchema;
+    advForm.data = this._config;
+    advForm.hass = this._hass;
+
+    advForm.addEventListener("value-changed", (ev) => {
+      this._config = { ...this._config, ...ev.detail.value };
+      this._dispatchConfigChanged();
+    });
+
+    advWrapper.appendChild(advForm);
+
+    // Reset / auto-fill knap
+    const resetBtn = document.createElement("button");
+    resetBtn.type = "button";
+    resetBtn.textContent = "Auto-fill from device";
+    resetBtn.style.marginTop = "8px";
+    resetBtn.addEventListener("click", () => {
+      if (!this._config.device_id) return;
+      this._autoFillFromDevice(this._config.device_id);
+      this._dispatchConfigChanged();
+    });
+
+    advWrapper.appendChild(resetBtn);
+
+    details.appendChild(advWrapper);
+    container.appendChild(details);
+
     this.appendChild(container);
 
-    this._form = form;
+    this._formAdvanced = advForm;
+  }
+
+  _autoFillFromDevice(deviceId) {
+    if (!this._hass || !this._hass.entities) return;
+
+    // Find alle entities på den valgte device
+    const entityIds = Object.keys(this._hass.states).filter((eid) => {
+      const reg = this._hass.entities[eid];
+      return reg && reg.device_id === deviceId;
+    });
+
+    const find = (domain, suffix) =>
+      entityIds.find(
+        (eid) =>
+          eid.startsWith(domain + ".") &&
+          (suffix.startsWith("_")
+            ? eid.endsWith(suffix)
+            : eid.endsWith("_" + suffix))
+      );
+
+    const patch = {
+      // Core
+      cv_mode: find("select", "cv_mode"),
+      vv_mode: find("select", "vv_mode"),
+      cv_night: find("select", "cv_night"),
+      vv_schedule: find("select", "vv_schedule"),
+      aux_heating: find("select", "aux_heating"),
+      vv_setpoint: find("number", "vv_setpoint") || find("input_number", "vv_setpoint"),
+
+      // Temps
+      outdoor_temp: find("sensor", "outdoor"),
+      curve_temp: find("sensor", "curve_temp"),
+      storage_tank_cv: find("sensor", "storage_tank_cv"),
+      storage_tank_vv: find("sensor", "storage_tank_vv"),
+      evaporator_temp: find("sensor", "evaporator"),
+      hp_temp: find("sensor", "compressor_hp"),
+      lp_temp: find("sensor", "compressor_lp"),
+      cv_forward_temp: find("sensor", "cv_forward"),
+      cv_return_temp: find("sensor", "cv_return"),
+
+      // Energy
+      em23_power: find("sensor", "em23_power"),
+      em23_energy: find("sensor", "em23_energy"),
+
+      // Binary
+      comp_icon: find("binary_sensor", "soft_starter_compressor"),
+      cv_pump_icon: find("binary_sensor", "circ_pump_cv"),
+      defrost_icon: find("binary_sensor", "4_way_valve_defrost"),
+    };
+
+    // Popup-lister – bygges helt forfra når vi auto-filler
+    const info_entities = [
+      patch.em23_energy,
+      entityIds.find((e) => e.endsWith("_comp_hours")),
+      entityIds.find((e) => e.endsWith("_vv_hours")),
+      entityIds.find((e) => e.endsWith("_heating_hours")),
+    ].filter(Boolean);
+
+    const cv_entities = [
+      patch.cv_mode,
+      entityIds.find((e) => e.startsWith("number.") && e.endsWith("_cv_curve")),
+      patch.aux_heating,
+      patch.cv_night,
+    ].filter(Boolean);
+
+    const vv_entities = [
+      patch.vv_setpoint,
+      patch.vv_mode,
+      patch.vv_schedule,
+    ].filter(Boolean);
+
+    const aux_entities = [
+      patch.aux_heating,
+      entityIds.find((e) => e.startsWith("sensor.") && e.endsWith("_heating_hours")),
+    ].filter(Boolean);
+
+    this._config = {
+      ...this._config,
+      ...patch,
+      info_entities,
+      cv_entities,
+      vv_entities,
+      aux_entities,
+    };
+
+    // Re-render så felterne opdateres i UI'et
+    this._render();
   }
 
   _dispatchConfigChanged() {
@@ -850,10 +999,10 @@ class Lv12HeatpumpCard extends HTMLElement {
       })
     );
   }
-} 
- 
- customElements.define("lv12-heatpump-card-editor", Lv12HeatpumpCardEditor); 
- 
+}
+
+customElements.define("lv12-heatpump-card-editor", Lv12HeatpumpCardEditor);
+
  // Register card in the Lovelace card picker
  window.customCards = window.customCards || [];
  window.customCards.push({
