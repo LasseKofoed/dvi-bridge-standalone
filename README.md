@@ -54,12 +54,17 @@ nano .env
 
 Example `.env`:
 
-```ini
-MQTT_HOST=192.168.x.xxx
-MQTT_PORT=1883
-MQTT_USER=
-MQTT_PASS=
-```
+  MQTT_HOST=192.168.x.xxx
+  MQTT_PORT=1883
+
+  # Optional: only set these if your MQTT broker requires authentication.
+  # If left empty, the bridge will connect without username/password.
+  MQTT_USER=
+  MQTT_PASS=
+
+  # Optional: replace with your specific model e.g. LV7, LV9, LV12, LV16
+  # This is used to set correct topics and units (default is LVx)
+  HEATPUMP_MODEL=LVx
 
 Leave `MQTT_USER` / `MQTT_PASS` empty if your broker does not require authentication.
 
@@ -190,7 +195,7 @@ Home Assistant → **HACS** → *Frontend* → ⋮ (menu) → **Custom repositor
 
 ### 2. Add the repository  
 - **URL:**  
-  `https://github.com/LasseKofoed/dvi-bridge-standalone`
+  `https://github.com/ruteclrp/dvi-bridge-standalone`
 - **Category:** `Dashboard`
 
 Click **Add**.
@@ -219,19 +224,25 @@ Press **Ctrl+F5** (or full refresh on mobile) to ensure the new card files load.
 3. Click **Add card**  
 4. Select **DVI LV‑X Heatpump Card**
 
-A full configuration UI appears.  
-From here you can visually pick all entities discovered via MQTT:
+### Automatic configuration (no YAML needed)
+When adding the card in Lovelace, a full configuration UI appears.
 
-- CV mode  
-- VV mode  
-- CV night mode  
-- VV schedule  
-- AUX mode  
-- All temperature sensors  
-- Pump/compressor/defrost binary sensors  
-- Entities shown in the popup panels (Info / CV / VV / AUX)
+1. Select your DVI LV-X MQTT device from the dropdown.
+2. The card automatically detects all related entities on that device.
+3. All fields are mapped instantly — no manual configuration required.
 
-No YAML needed — unless you prefer YAML manually.
+The auto-mapping includes:
+
+* CV mode
+* VV mode
+* CV night mode
+* VV schedule
+* AUX electric heater mode
+* All relevant temperature sensors
+* Pump / compressor / defrost binary sensors
+* Entities for the popup panels (Info / CV / VV / AUX)
+
+If you prefer full control, you can still override or manually edit any field in the Advanced entity mapping section.
 
 ---
 

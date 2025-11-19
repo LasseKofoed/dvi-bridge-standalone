@@ -18,8 +18,11 @@ import glob
 devices = glob.glob("/dev/serial/by-id/*STM32*")
 
 if not devices:
+    print("❌ STM32 Virtual COM Port not found! Check USB cable and that the heatpump interface is connected.")
     raise RuntimeError("STM32 Virtual COM Port not found!")
-serial_port = devices[0] 
+else:
+    serial_port = devices[0]
+    print(f"✅ Connected to STM32 Virtual COM Port: {serial_port}")
 
 load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -35,17 +38,27 @@ instrument.mode = minimalmodbus.MODE_RTU
 
 modbus_lock = threading.Lock()
 
+from typing import Optional
+
 # Read credentials and broker info from environment variables
-MQTT_USER = os.getenv("MQTT_USER", "default_user")
-MQTT_PASS = os.getenv("MQTT_PASS", "default_pass")
+MQTT_USER: Optional[str] = os.getenv("MQTT_USER") or None
+MQTT_PASS: Optional[str] = os.getenv("MQTT_PASS") or None
 MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+
+# Get heatpump model from environment variable
+HEATPUMP_MODEL = os.getenv("HEATPUMP_MODEL", "LVx")
+if HEATPUMP_MODEL == "LVx":
+    print("⚠️ HEATPUMP_MODEL not set in .env, using placeholder LVx")
 
 # MQTT setup
 mqtt_client = mqtt.Client()
 ##mqtt_client.enable_logger(logger)
 mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
-mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
+
+# Only set username/password if both are provided (support brokers with no auth)
+if MQTT_USER and MQTT_PASS:
+    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -66,11 +79,12 @@ def publish_discovery_sensor(name, unique_id, value_template,
         "value_template": value_template,
         "unique_id": unique_id,
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         }
+
     }
     if unit: payload["unit_of_measurement"] = unit
     if device_class: payload["device_class"] = device_class
@@ -94,10 +108,10 @@ def publish_discovery_binary(name, unique_id, coil_key, device_class=None):
         "value_template": value_template,
         "unique_id": unique_id,
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         },
         "entity_category": "diagnostic"
     }
@@ -118,10 +132,10 @@ def publish_discovery_number(name, unique_id, command_topic, state_template,
         "step": step,
         "mode": "box",
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         }
     }
     if unit: payload["unit_of_measurement"] = unit
@@ -138,10 +152,10 @@ def publish_discovery_select(name, unique_id, command_topic, state_template, opt
         "unique_id": unique_id,
         "options": options,
         "device": {
-            "name": "DVI LV12",
-            "identifiers": ["dvi_lv12"],
+            "name": f"DVI {HEATPUMP_MODEL}",
+            "identifiers": [f"dvi_{HEATPUMP_MODEL.lower()}"],
             "manufacturer": "DVI",
-            "model": "LV12 Heatpump"
+            "model": f"{HEATPUMP_MODEL} Heatpump"
         }
     }
     msg = json.dumps(payload)
