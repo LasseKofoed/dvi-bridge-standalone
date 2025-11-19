@@ -1,29 +1,7 @@
-name: Build HACS ZIP
-
-on:
-  push:
-    tags:
-      - "v*"
-
-jobs:
-  build-release:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Create release ZIP for Lovelace card
-        run: |
-          mkdir -p dist
-          # Lav en ZIP med KUN de filer HACS skal bruge til frontend
-          zip -r dist/dvi-lv-x-heatpump-card.js.zip \
-            dvi-lv-x-heatpump-card.js \
-            dvi-lv-x/
-
-      - name: Upload ZIP as release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/dvi-lv-x-heatpump-card.js.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+- name: Build plugin
+  run: |
+    mkdir -p dist/dvi-lv-x
+    cp dvi-lv-x-heatpump-card.js dist/
+    cp -r dvi-lv-x/* dist/dvi-lv-x/
+    cp hacs.json dist/
+    cp README.md dist/
