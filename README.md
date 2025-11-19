@@ -30,7 +30,7 @@ sudo apt install -y git python3 python3-pip python3-venv
 
 ```bash
 cd /home/dviha
-git clone https://github.com/<your-org-or-user>/dvi-bridge-standalone.git
+git clone https://github.com/ruteclrp/dvi-bridge-standalone.git
 cd dvi-bridge-standalone
 ```
 
