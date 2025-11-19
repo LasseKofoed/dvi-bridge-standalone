@@ -1,7 +1,36 @@
-- name: Build plugin
-  run: |
-    mkdir -p dist/dvi-lv-x
-    cp dvi-lv-x-heatpump-card.js dist/
-    cp -r dvi-lv-x/* dist/dvi-lv-x/
-    cp hacs.json dist/
-    cp README.md dist/
+name: Build and release DVI LV-X Heatpump Card
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Build the dist folder for HACS
+      - name: Prepare dist folder
+        run: |
+          rm -rf dist
+          mkdir -p dist/dvi-lv-x
+          cp dvi-lv-x-heatpump-card.js dist/
+          cp -r dvi-lv-x/* dist/dvi-lv-x/
+
+      # # Optional: create a ZIP with the dist contents for manual installs
+      # - name: Create ZIP from dist
+      #   run: |
+      #     cd dist
+      #     zip -r ../dvi-lv-x-heatpump-card.js.zip .
+
+      # - name: Create GitHub Release
+      #   uses: softprops/action-gh-release@v2
+      #   with:
+      #     files: |
+      #       dvi-lv-x-heatpump-card.js.zip
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
