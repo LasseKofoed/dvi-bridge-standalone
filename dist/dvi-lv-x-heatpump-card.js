@@ -1,4 +1,4 @@
-class Lv12HeatpumpCard extends HTMLElement {
+class LvXHeatpumpCard extends HTMLElement {
   // Base path for images, regardless of where HACS installs the card
    static get imageBase() {
      return new URL("./dvi-lv-x/", import.meta.url).href;
@@ -122,7 +122,7 @@ class Lv12HeatpumpCard extends HTMLElement {
          }
        </style>
        <ha-card>
-         <div class="header">DVI LV12 Compact varmepumpe</div>
+         <div class="header">DVI X Compact varmepumpe</div>
          <div class="diagram" id="diagram"></div>
          <div class="grid" id="grid"></div>
        </ha-card>
@@ -228,7 +228,7 @@ class Lv12HeatpumpCard extends HTMLElement {
      /* --- build diagram --- */
  
      diagram.innerHTML = `
-       <img src="${Lv12HeatpumpCard.imageBase}/dvi.gif" class="diagram-base" alt="LV12 diagram" />
+       <img src="${LvXHeatpumpCard.imageBase}/dvi.gif" class="diagram-base" alt="LVX diagram" />
  
        ${
          outdoor !== null
@@ -290,20 +290,20 @@ class Lv12HeatpumpCard extends HTMLElement {
        <div class="diagram-icon" style="top:78%; left:89%; width:21%; opacity:${onOpacity(
          cvPumpState
        )};">
-         <img src="${Lv12HeatpumpCard.imageBase}CV_on.gif" alt="CV pump" />
+         <img src="${LvXHeatpumpCard.imageBase}CV_on.gif" alt="CV pump" />
        </div>
        <div class="diagram-icon" style="top:89.9%; left:71.8%; width:14.2%; opacity:${onOpacity(
          cvPumpState
        )};">
-         <img src="${Lv12HeatpumpCard.imageBase}CVflow_on.gif" alt="CV flow" />
+         <img src="${LvXHeatpumpCard.imageBase}CVflow_on.gif" alt="CV flow" />
        </div>
  
        <!-- Compressor / HP gifs -->
        <div class="diagram-icon" style="top:62.7%; left:18.4%; width:33.9%; opacity:${compState === "on" ? 1 : 0.0};">
-         <img src="${Lv12HeatpumpCard.imageBase}HP_on.gif" alt="HP on" />
+         <img src="${LvXHeatpumpCard.imageBase}HP_on.gif" alt="HP on" />
        </div>
        <div class="diagram-icon" style="top:62.75%; left:46%; width:21.3%; opacity:${compState === "on" ? 1 : 0.0};">
-         <img src="${Lv12HeatpumpCard.imageBase}COMP_on.gif" alt="Compressor on" />
+         <img src="${LvXHeatpumpCard.imageBase}COMP_on.gif" alt="Compressor on" />
        </div>
  
        <!-- Defrost icon (snowflake) -->
@@ -584,64 +584,64 @@ class Lv12HeatpumpCard extends HTMLElement {
    // }
  
    static getConfigElement() {
-     return document.createElement("lv12-heatpump-card-editor");
+     return document.createElement("lvx-heatpump-card-editor");
    }
  
      static getStubConfig(hass, entities) {
      // Default config used when you add the card from the UI
      return {};
      return {
-       type: "custom:lv12-heatpump-card",
+       type: "custom:lvx-heatpump-card",
  
-       cv_mode: "select.dvi_lv12_cv_mode",
-       vv_mode: "select.dvi_lv12_vv_mode",
-       cv_night: "select.dvi_lv12_cv_night",
-       vv_schedule: "select.dvi_lv12_vv_schedule",
-       aux_heating: "select.dvi_lv12_aux_heating",
-       vv_setpoint: "number.dvi_lv12_vv_setpoint",
+       cv_mode: "select.dvi_lvx_cv_mode",
+       vv_mode: "select.dvi_lvx_vv_mode",
+       cv_night: "select.dvi_lvx_cv_night",
+       vv_schedule: "select.dvi_lvx_vv_schedule",
+       aux_heating: "select.dvi_lvx_aux_heating",
+       vv_setpoint: "number.dvi_lvx_vv_setpoint",
  
-       outdoor_temp: "sensor.dvi_lv12_outdoor",
-       curve_temp: "sensor.dvi_lv12_curve_temp",
-       storage_tank_cv: "sensor.dvi_lv12_storage_tank_cv",
-       storage_tank_vv: "sensor.dvi_lv12_storage_tank_vv",
-       evaporator_temp: "sensor.dvi_lv12_evaporator",
-       hp_temp: "sensor.dvi_lv12_compressor_hp",
-       lp_temp: "sensor.dvi_lv12_compressor_lp",
-       cv_forward_temp: "sensor.dvi_lv12_cv_forward",
-       cv_return_temp: "sensor.dvi_lv12_cv_return",
-       em23_power: "sensor.dvi_lv12_em23_power",
-       em23_energy: "sensor.dvi_lv12_em23_energy",
+       outdoor_temp: "sensor.dvi_lvx_outdoor",
+       curve_temp: "sensor.dvi_lvx_curve_temp",
+       storage_tank_cv: "sensor.dvi_lvx_storage_tank_cv",
+       storage_tank_vv: "sensor.dvi_lvx_storage_tank_vv",
+       evaporator_temp: "sensor.dvi_lvx_evaporator",
+       hp_temp: "sensor.dvi_lvx_compressor_hp",
+       lp_temp: "sensor.dvi_lvx_compressor_lp",
+       cv_forward_temp: "sensor.dvi_lvx_cv_forward",
+       cv_return_temp: "sensor.dvi_lvx_cv_return",
+       em23_power: "sensor.dvi_lvx_em23_power",
+       em23_energy: "sensor.dvi_lvx_em23_energy",
  
-       comp_icon: "binary_sensor.dvi_lv12_soft_starter_compressor",
-       cv_pump_icon: "binary_sensor.dvi_lv12_circ_pump_cv",
-       defrost_icon: "binary_sensor.dvi_lv12_4_way_valve_defrost",
+       comp_icon: "binary_sensor.dvi_lvx_soft_starter_compressor",
+       cv_pump_icon: "binary_sensor.dvi_lvx_circ_pump_cv",
+       defrost_icon: "binary_sensor.dvi_lvx_4_way_valve_defrost",
  
        info_entities: [
-         "sensor.dvi_lv12_em23_energy",
-         "sensor.dvi_lv12_comp_hours",
-         "sensor.dvi_lv12_vv_hours",
-         "sensor.dvi_lv12_heating_hours"
+         "sensor.dvi_lvx_em23_energy",
+         "sensor.dvi_lvx_comp_hours",
+         "sensor.dvi_lvx_vv_hours",
+         "sensor.dvi_lvx_heating_hours"
        ],
        cv_entities: [
-         "select.dvi_lv12_cv_mode",
-         "number.dvi_lv12_cv_curve",
-         "select.dvi_lv12_aux_heating",
-         "select.dvi_lv12_cv_night"
+         "select.dvi_lvx_cv_mode",
+         "number.dvi_lvx_cv_curve",
+         "select.dvi_lvx_aux_heating",
+         "select.dvi_lvx_cv_night"
        ],
        vv_entities: [
-         "number.dvi_lv12_vv_setpoint",
-         "select.dvi_lv12_vv_mode",
-         "select.dvi_lv12_vv_schedule"
+         "number.dvi_lvx_vv_setpoint",
+         "select.dvi_lvx_vv_mode",
+         "select.dvi_lvx_vv_schedule"
        ],
        aux_entities: [
-         "select.dvi_lv12_aux_heating",
-         "sensor.dvi_lv12_heating_hours"
+         "select.dvi_lvx_aux_heating",
+         "sensor.dvi_lvx_heating_hours"
        ]
      };
    }
  
  }
-class Lv12HeatpumpCardEditor extends HTMLElement {
+class LvXHeatpumpCardEditor extends HTMLElement {
   constructor() {
     super();
     this._config = {};
@@ -669,7 +669,7 @@ class Lv12HeatpumpCardEditor extends HTMLElement {
     this._basicSchema = [
       {
         name: "device_id",
-          label: "DVI LV12 MQTT device",
+          label: "DVI X MQTT device",
         selector: {
           device: {
             integration: "mqtt",
@@ -1001,17 +1001,17 @@ class Lv12HeatpumpCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("lv12-heatpump-card-editor", Lv12HeatpumpCardEditor);
+customElements.define("lvx-heatpump-card-editor", LvXHeatpumpCardEditor);
 
  // Register card in the Lovelace card picker
  window.customCards = window.customCards || [];
  window.customCards.push({
-   type: "lv12-heatpump-card",
+   type: "lvx-heatpump-card",
    name: "DVI LV-X Heatpump Card",
    description: "Visual overview and control panel for a DVI LV-X heatpump.",
    preview: true,                 // gør at det dukker op under "Custom cards"
    documentationURL: "https://github.com/ruteclrp/dvi-bridge-standalone"
  });
  
- customElements.define("lv12-heatpump-card", Lv12HeatpumpCard);
+ customElements.define("lvx-heatpump-card", LvXHeatpumpCard);
  
