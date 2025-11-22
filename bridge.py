@@ -18,8 +18,11 @@ import glob
 devices = glob.glob("/dev/serial/by-id/*STM32*")
 
 if not devices:
+    print("❌ STM32 Virtual COM Port not found! Check USB cable and that the heatpump interface is connected.")
     raise RuntimeError("STM32 Virtual COM Port not found!")
-serial_port = devices[0] 
+else:
+    serial_port = devices[0]
+    print(f"✅ Connected to STM32 Virtual COM Port: {serial_port}")
 
 load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -35,9 +38,11 @@ instrument.mode = minimalmodbus.MODE_RTU
 
 modbus_lock = threading.Lock()
 
+from typing import Optional
+
 # Read credentials and broker info from environment variables
-MQTT_USER = os.getenv("MQTT_USER", "default_user")
-MQTT_PASS = os.getenv("MQTT_PASS", "default_pass")
+MQTT_USER: Optional[str] = os.getenv("MQTT_USER") or None
+MQTT_PASS: Optional[str] = os.getenv("MQTT_PASS") or None
 MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
@@ -50,7 +55,10 @@ if HEATPUMP_MODEL == "LVx":
 mqtt_client = mqtt.Client()
 ##mqtt_client.enable_logger(logger)
 mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
-mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
+
+# Only set username/password if both are provided (support brokers with no auth)
+if MQTT_USER and MQTT_PASS:
+    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
