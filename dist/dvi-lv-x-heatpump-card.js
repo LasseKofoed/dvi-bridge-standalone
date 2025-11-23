@@ -122,7 +122,7 @@ class LvXHeatpumpCard extends HTMLElement {
          }
        </style>
        <ha-card>
-         <div class="header">DVI X Compact varmepumpe</div>
+         <div class="header">DVI LV Compact varmepumpe</div>
          <div class="diagram" id="diagram"></div>
          <div class="grid" id="grid"></div>
        </ha-card>
@@ -232,15 +232,15 @@ class LvXHeatpumpCard extends HTMLElement {
  
        ${
          outdoor !== null
-           ? `<div class="diagram-label" style="top:13%; left:13%;  z-index:100;">${outdoor} °C</div>`
+           ? `<div class="diagram-label" style="top:11%; left:13%;  z-index:100;">${outdoor} °C</div>`
            : ""
        }
  
-       <div class="diagram-label" style="top:13%; left:48%; z-index:100;">kurvetemperatur</div>
+       <div class="diagram-label" style="top:18%; left:50%; z-index:100;">kurvetemperatur</div>
  
        ${
          curveTemp !== null
-           ? `<div class="diagram-label" style="top:13%; left:68%; z-index:100;">${curveTemp} °C</div>`
+           ? `<div class="diagram-label" style="top:18%; left:68%; z-index:100;">${curveTemp} °C</div>`
            : ""
        }
  
@@ -270,39 +270,39 @@ class LvXHeatpumpCard extends HTMLElement {
  
        ${
          tankVv !== null
-           ? `<div class="diagram-label" style="top:33%; left:85%; z-index:100;">${tankVv} °C</div>`
+           ? `<div class="diagram-label" style="top:33%; left:80%; z-index:100;">${tankVv} °C</div>`
            : ""
        }
  
        ${
          cvForwardTemp !== null
-           ? `<div class="diagram-label" style="top:77.4%; left:75%; z-index:100;">${cvForwardTemp} °C</div>`
+           ? `<div class="diagram-label" style="top:79.2%; left:73%; z-index:100;">${cvForwardTemp} °C</div>`
            : ""
        }
  
        ${
          cvReturnTemp !== null
-           ? `<div class="diagram-label" style="top:96%; left:75%;z-index:100;">${cvReturnTemp} °C</div>`
+           ? `<div class="diagram-label" style="top:94%; left:73%;z-index:100;">${cvReturnTemp} °C</div>`
            : ""
        }
  
        <!-- CV pump + flow gifs -->
-       <div class="diagram-icon" style="top:78%; left:89%; width:21%; opacity:${onOpacity(
+       <div class="diagram-icon" style="top:79.3%; left:88.8%; width:21%; opacity:${onOpacity(
          cvPumpState
        )};">
          <img src="${LvXHeatpumpCard.imageBase}CV_on.gif" alt="CV pump" />
        </div>
-       <div class="diagram-icon" style="top:89.9%; left:71.8%; width:14.2%; opacity:${onOpacity(
+       <div class="diagram-icon" style="top:89.95%; left:71.7%; width:14.2%; opacity:${onOpacity(
          cvPumpState
        )};">
          <img src="${LvXHeatpumpCard.imageBase}CVflow_on.gif" alt="CV flow" />
        </div>
  
        <!-- Compressor / HP gifs -->
-       <div class="diagram-icon" style="top:62.7%; left:18.4%; width:33.9%; opacity:${compState === "on" ? 1 : 0.0};">
+       <div class="diagram-icon" style="top:63.75%; left:18.4%; width:33.9%; opacity:${compState === "on" ? 1 : 0.0};">
          <img src="${LvXHeatpumpCard.imageBase}HP_on.gif" alt="HP on" />
        </div>
-       <div class="diagram-icon" style="top:62.75%; left:46%; width:21.3%; opacity:${compState === "on" ? 1 : 0.0};">
+       <div class="diagram-icon" style="top:63.75%; left:46%; width:21.3%; opacity:${compState === "on" ? 1 : 0.0};">
          <img src="${LvXHeatpumpCard.imageBase}COMP_on.gif" alt="Compressor on" />
        </div>
  
