@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-
+import sys
 import os
 import minimalmodbus
 import paho.mqtt.client as mqtt
@@ -9,6 +9,7 @@ import time
 import threading
 import warnings
 import glob
+import subprocess  # <-- new
 
 # Find STM32 Virtual COM Port automatically
 devices = glob.glob("/dev/serial/by-id/*STM32*")
@@ -23,6 +24,52 @@ else:
 load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+# Pump ID / FABNR from environment (written by read_fabnr_modbustk.py)
+from typing import Optional
+
+def _ensure_pump_id() -> Optional[str]:
+    """
+    Hvis FABNR ikke er sat i .env, prøv at køre read_fabnr_modbustk.py én gang
+    for at hente den via modbus_tk. Reload derefter .env og returner FABNR.
+    """
+    pid = os.getenv("FABNR") or None
+    if pid:
+        return pid
+
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "read_fabnr_modbustk.py")
+    if not os.path.isfile(script_path):
+        print("⚠️ FABNR not set and read_fabnr_modbustk.py not found; skipping FABNR auto-detect.")
+        return None
+
+    print("ℹ️ No FABNR in .env, attempting to read via read_fabnr_modbustk.py ...")
+    try:
+        # Kør scriptet som separat proces, så modbus_tk/minimalmodbus ikke blandes i samme interpreter
+        result = subprocess.run(
+            [sys.executable, script_path],
+            cwd=os.path.dirname(script_path),
+            timeout=60,
+            capture_output=True,
+            text=True,
+        )
+        print(result.stdout, end="")
+        if result.returncode != 0:
+            print(f"⚠️ read_fabnr_modbustk.py exited with code {result.returncode}")
+            if result.stderr:
+                print(result.stderr, end="")
+        else:
+            # Scriptet opdaterer .env; reload og læs FABNR igen
+            load_dotenv(override=True)
+    except Exception as e:
+        print(f"⚠️ Failed to run read_fabnr_modbustk.py: {e}")
+
+    return os.getenv("FABNR") or None
+
+PUMP_ID: Optional[str] = _ensure_pump_id()
+if PUMP_ID:
+    print(f"🆔 Fabrication ID set to: {PUMP_ID}")
+else:
+    print("⚠️ No fabrication ID (FABNR) found – will not be able to upload data to DVI backend.")
+
 # Modbus setup
 instrument = minimalmodbus.Instrument(serial_port, 0x10)
 instrument.serial.baudrate = 9600
@@ -34,8 +81,6 @@ instrument.mode = minimalmodbus.MODE_RTU
 
 modbus_lock = threading.Lock()
 
-from typing import Optional
-
 # Read credentials and broker info from environment variables
 MQTT_USER: Optional[str] = os.getenv("MQTT_USER") or None
 MQTT_PASS: Optional[str] = os.getenv("MQTT_PASS") or None
@@ -46,6 +91,8 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 HEATPUMP_MODEL = os.getenv("HEATPUMP_MODEL", "LV")
 if HEATPUMP_MODEL == "LV":
     print("⚠️ HEATPUMP_MODEL not set in .env, using placeholder LV")
+
+
 
 # MQTT setup
 mqtt_client = mqtt.Client()
@@ -78,6 +125,9 @@ def publish_discovery_sensor(name, unique_id, value_template,
             "model": f"{HEATPUMP_MODEL} Heatpump"
         }
     }
+    if PUMP_ID:
+        payload["device"]["identifiers"].append(f"pump_{PUMP_ID}")
+        payload["device"]["serial_number"] = PUMP_ID
     if unit: payload["unit_of_measurement"] = unit
     if device_class: payload["device_class"] = device_class
     if state_class: payload["state_class"] = state_class
@@ -103,7 +153,11 @@ def publish_discovery_binary(name, unique_id, coil_key, device_class=None):
         },
         "entity_category": "diagnostic"
     }
-    if device_class: payload["device_class"] = device_class
+    if PUMP_ID:
+        payload["device"]["identifiers"].append(f"pump_{PUMP_ID}")
+        payload["device"]["serial_number"] = PUMP_ID
+    if device_class:
+        payload["device_class"] = device_class
     mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
 
 def publish_discovery_number(name, unique_id, command_topic, state_template,
@@ -126,6 +180,9 @@ def publish_discovery_number(name, unique_id, command_topic, state_template,
             "model": f"{HEATPUMP_MODEL} Heatpump"
         }
     }
+    if PUMP_ID:
+        payload["device"]["identifiers"].append(f"pump_{PUMP_ID}")
+        payload["device"]["serial_number"] = PUMP_ID
     if unit: payload["unit_of_measurement"] = unit
     if entity_category: payload["entity_category"] = entity_category
     mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
@@ -146,7 +203,11 @@ def publish_discovery_select(name, unique_id, command_topic, state_template, opt
             "model": f"{HEATPUMP_MODEL} Heatpump"
         }
     }
-    if entity_category: payload["entity_category"] = entity_category
+    if PUMP_ID:
+        payload["device"]["identifiers"].append(f"pump_{PUMP_ID}")
+        payload["device"]["serial_number"] = PUMP_ID
+    if entity_category:
+        payload["entity_category"] = entity_category
     msg = json.dumps(payload)
     mqtt_client.publish(config_topic, msg, retain=True)
 
@@ -673,6 +734,9 @@ while True:
         "input_registers": dict(sorted(last_inputs.items())),
         "write_registers": dict(sorted(last_writes.items()))
     }
+    # Eksponér pumpid i measurement payload
+    if PUMP_ID:
+        full_payload["pumpid"] = PUMP_ID
 
     # Only publish if payload changed
     if full_payload != last_published:

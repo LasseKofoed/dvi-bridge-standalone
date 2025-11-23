@@ -1,3 +1,5 @@
 minimalmodbus
 paho-mqtt
 python-dotenv
+modbus-tk
+pyserial
