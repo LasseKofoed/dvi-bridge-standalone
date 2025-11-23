@@ -1,9 +1,9 @@
-# DVI LV‑X Heatpump – Bridge & Home Assistant Card
+# DVI LV Heatpump – Bridge & Home Assistant Card
 
 This document describes both:
 
 1. **DVI Modbus‑MQTT bridge** for Raspberry Pi (talks Modbus RTU with the heatpump and publishes data via MQTT with Home Assistant auto‑discovery).
-2. **DVI LV‑X Heatpump Lovelace card** – a custom frontend card that visualises the heatpump diagram, modes and temperatures and lets you change key settings directly from Home Assistant.
+2. **DVI LV Heatpump Lovelace card** – a custom frontend card that visualises the heatpump diagram, modes and temperatures and lets you change key settings directly from Home Assistant.
 
 The repository is designed so both parts can live in the same project (bridge + card) and be distributed via HACS as a frontend card.
 
@@ -14,7 +14,7 @@ The repository is designed so both parts can live in the same project (bridge + 
 ### Prerequisites
 
 - Raspberry Pi OS Lite (64‑bit) – when you install, **set the default username to `dviha`** to match the paths and examples in this guide.
-- USB connection to DVI LV‑X heatpump
+- USB connection to DVI LV heatpump
 - MQTT broker (e.g. the Mosquitto broker add‑on in Home Assistant)
 - Git + Python 3.9+ on the Pi
 
@@ -63,8 +63,8 @@ Example `.env`:
   MQTT_PASS=
 
   # Optional: replace with your specific model e.g. LV7, LV9, LV12, LV16
-  # This is used to set correct topics and units (default is LVx)
-  HEATPUMP_MODEL=LVx
+  # This is used to set correct topics and units (default is LV) - will be used in future updates
+  HEATPUMP_MODEL=LV
 
 Leave `MQTT_USER` / `MQTT_PASS` empty if your broker does not require authentication.
 
@@ -180,9 +180,9 @@ As long as MQTT discovery is enabled in Home Assistant, all entities will appear
 
 ## C. 
 
-# DVI LV‑X Heatpump Lovelace Card
+# DVI LV Heatpump Lovelace Card
 
-The **DVI LV‑X Heatpump card** provides a full visual diagram of your LV‑X heatpump, live temperatures, compressor/pump status, mode controls, animated overlays, and popup panels for detailed settings.
+The **DVI LV Heatpump card** provides a full visual diagram of your LV heatpump, live temperatures, compressor/pump status, mode controls, animated overlays, and popup panels for detailed settings.
 
 It is fully compatible with HACS and includes a visual configuration editor.
 
@@ -203,7 +203,7 @@ Click **Add**.
 ### 3. Install the card  
 Go to **HACS → Frontend**, find:
 
-**“DVI LV‑X Heatpump Card”**
+**“DVI LV Heatpump Card”**
 
 Click **Download**.  
 HACS installs everything automatically into:
@@ -222,12 +222,12 @@ Press **Ctrl+F5** (or full refresh on mobile) to ensure the new card files load.
 1. Open any dashboard  
 2. Click **Edit dashboard**  
 3. Click **Add card**  
-4. Select **DVI LV‑X Heatpump Card**
+4. Select **DVI LV Heatpump Card**
 
 ### Automatic configuration (no YAML needed)
 When adding the card in Lovelace, a full configuration UI appears.
 
-1. Select your DVI LV-X MQTT device from the dropdown.
+1. Select your DVI LV MQTT device from the dropdown.
 2. The card automatically detects all related entities on that device.
 3. All fields are mapped instantly — no manual configuration required.
 
@@ -262,7 +262,7 @@ browser_mod:
 
 ## 🎨 Features
 
-- Animated LV‑X heating circuit diagram  
+- Animated LV heating circuit diagram  
 - Real‑time temperatures drawn directly in the diagram  
 - Live compressor, CV pump and defrost icons  
 - Mode bar with:
@@ -305,17 +305,17 @@ Home Assistant’s **Energy dashboard** can be extended with a sensor that repor
 
 With the EM23 meter you already have:
 
-- `sensor.dvi_lv12_em23_power` (instant kW)
-- `sensor.dvi_lv12_em23_energy` (total kWh, `state_class: total_increasing`)
+- `sensor.dvi_lv_em23_power` (instant kW)
+- `sensor.dvi_lv_em23_energy` (total kWh, `state_class: total_increasing`)
 
 To use this in the Energy dashboard:
 
-1. Make sure `sensor.dvi_lv12_em23_energy` has:
+1. Make sure `sensor.dvi_lv_em23_energy` has:
    - `device_class: energy`
    - `unit_of_measurement: kWh`
    - `state_class: total_increasing`  
    (the bridge already publishes these via discovery)
-2. Go to **Settings → Dashboards → Energy → Electricity grid → Setup** and select `sensor.dvi_lv12_em23_energy` as a consumption source.
+2. Go to **Settings → Dashboards → Energy → Electricity grid → Setup** and select `sensor.dvi_lv_em23_energy` as a consumption source.
 
 If you later add a calculated **heat output** sensor (COP × electric energy), you can add that as a custom energy source as well.
 
