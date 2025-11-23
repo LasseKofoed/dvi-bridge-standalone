@@ -208,6 +208,13 @@ class LvHeatpumpCard extends HTMLElement {
       cvReturn: cfg.cv_return_temp,
     };
 
+    // Map for binary ikon-klik
+    const iconEntityMap = {
+      defrost: cfg.defrost_icon,
+      comp: cfg.comp_icon,
+      cvPump: cfg.cv_pump_icon,
+    };
+
     /* --- build diagram --- */
 
     diagram.innerHTML = `
@@ -270,22 +277,22 @@ class LvHeatpumpCard extends HTMLElement {
       }
 
       <!-- CV pump + flow gifs -->
-      <div class="diagram-icon" style="top:79.3%; left:88.8%; width:21%; opacity:${onOpacity(
+      <div class="diagram-icon" data-icon-key="cvPump" style="top:79.3%; left:88.8%; width:21%; opacity:${onOpacity(
         cvPumpState
       )};">
         <img src="${LvHeatpumpCard.imageBase}CV_on.gif" alt="CV pump" />
       </div>
-      <div class="diagram-icon" style="top:89.95%; left:71.7%; width:14.2%; opacity:${onOpacity(
+      <div class="diagram-icon" data-icon-key="cvPump" style="top:89.95%; left:71.7%; width:14.2%; opacity:${onOpacity(
         cvPumpState
       )};">
         <img src="${LvHeatpumpCard.imageBase}CVflow_on.gif" alt="CV flow" />
       </div>
 
       <!-- Compressor / HP gifs -->
-      <div class="diagram-icon" style="top:63.75%; left:18.4%; width:33.9%; opacity:${compState === "on" ? 1 : 0.0};">
+      <div class="diagram-icon" data-icon-key="comp" style="top:63.75%; left:18.4%; width:33.9%; opacity:${compState === "on" ? 1 : 0.0};">
         <img src="${LvHeatpumpCard.imageBase}HP_on.gif" alt="HP on" />
       </div>
-      <div class="diagram-icon" style="top:63.75%; left:46%; width:21.3%; opacity:${compState === "on" ? 1 : 0.0};">
+      <div class="diagram-icon" data-icon-key="comp" style="top:63.75%; left:46%; width:21.3%; opacity:${compState === "on" ? 1 : 0.0};">
         <img src="${LvHeatpumpCard.imageBase}COMP_on.gif" alt="Compressor on" />
       </div>
 
@@ -294,6 +301,7 @@ class LvHeatpumpCard extends HTMLElement {
         defrostState !== null
           ? `<ha-icon
                class="diagram-element"
+               data-icon-key="defrost"
                style="top:85%; left:15%; color:${
                  defrostState === "on" ? "orange" : "var(--disabled-text-color)"
                };"
@@ -375,6 +383,22 @@ class LvHeatpumpCard extends HTMLElement {
           composed: true,
         });
         this.dispatchEvent(ev);
+      });
+    });
+
+    /* --- native HA more-info popup på binary ikoner --- */
+    Object.entries(iconEntityMap).forEach(([key, entityId]) => {
+      if (!entityId) return;
+      diagram.querySelectorAll(`[data-icon-key="${key}"]`).forEach((el) => {
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => {
+          const ev = new CustomEvent("hass-more-info", {
+            detail: { entityId },
+            bubbles: true,
+            composed: true,
+          });
+          this.dispatchEvent(ev);
+        });
       });
     });
 
