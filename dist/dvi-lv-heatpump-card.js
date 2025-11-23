@@ -110,6 +110,13 @@ class LvHeatpumpCard extends HTMLElement {
     const getState = (entityId) =>
       entityId && this._hass.states[entityId] ? this._hass.states[entityId].state : null;
 
+    const getUnit = (entityId) =>
+      entityId && this._hass.states[entityId]
+        ? this._hass.states[entityId].attributes.unit_of_measurement || ""
+        : "";
+
+    const showUnit = cfg.show_temp_unit !== false; // default: true
+
     /* --- read states --- */
 
     // Modes
@@ -208,6 +215,14 @@ class LvHeatpumpCard extends HTMLElement {
       cvReturn: cfg.cv_return_temp,
     };
 
+    const unitForKey = (key) => {
+      if (!showUnit) return "";
+      const eid = stateEntityMap[key];
+      if (!eid) return "";
+      const u = getUnit(eid);
+      return u ? ` ${u}` : "";
+    };
+
     // Map for binary / aux ikon-klik
     const iconEntityMap = {
       defrost: cfg.defrost_icon,
@@ -223,7 +238,9 @@ class LvHeatpumpCard extends HTMLElement {
 
       ${
         outdoor !== null
-          ? `<div class="diagram-label" data-key="outdoor" style="top:11%; left:13%;  z-index:5;">${outdoor} °C</div>`
+          ? `<div class="diagram-label" data-key="outdoor" style="top:11%; left:13%;  z-index:5;">${outdoor}${unitForKey(
+              "outdoor"
+            )}</div>`
           : ""
       }
 
@@ -231,49 +248,65 @@ class LvHeatpumpCard extends HTMLElement {
 
       ${
         curveTemp !== null
-          ? `<div class="diagram-label" data-key="curve" style="top:18%; left:68%; z-index:5;">${curveTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="curve" style="top:18%; left:68%; z-index:5;">${curveTemp}${unitForKey(
+              "curve"
+            )}</div>`
           : ""
       }
 
       ${
         evapTemp !== null
-          ? `<div class="diagram-label" data-key="evap" style="top:77%; left:16%; z-index:5;">${evapTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="evap" style="top:77%; left:16%; z-index:5;">${evapTemp}${unitForKey(
+              "evap"
+            )}</div>`
           : ""
       }
 
       ${
         hpTemp !== null
-          ? `<div class="diagram-label" data-key="hp" style="top:31%; left:43.5%; z-index:5;">${hpTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="hp" style="top:31%; left:43.5%; z-index:5;">${hpTemp}${unitForKey(
+              "hp"
+            )}</div>`
           : ""
       }
 
       ${
         lpTemp !== null
-          ? `<div class="diagram-label" data-key="lp" style="top:31%; left:34%; z-index:5;">${lpTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="lp" style="top:31%; left:34%; z-index:5;">${lpTemp}${unitForKey(
+              "lp"
+            )}</div>`
           : ""
       }
 
       ${
         tankCv !== null
-          ? `<div class="diagram-label" data-key="tankCv" style="top:72.5%; left:61%; z-index:5;">${tankCv} °C</div>`
+          ? `<div class="diagram-label" data-key="tankCv" style="top:72.5%; left:61%; z-index:5;">${tankCv}${unitForKey(
+              "tankCv"
+            )}</div>`
           : ""
       }
 
       ${
         tankVv !== null
-          ? `<div class="diagram-label" data-key="tankVv" style="top:33%; left:80%; z-index:5;">${tankVv} °C</div>`
+          ? `<div class="diagram-label" data-key="tankVv" style="top:33%; left:80%; z-index:5;">${tankVv}${unitForKey(
+              "tankVv"
+            )}</div>`
           : ""
       }
 
       ${
         cvForwardTemp !== null
-          ? `<div class="diagram-label" data-key="cvForward" style="top:79.2%; left:73%; z-index:5;">${cvForwardTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="cvForward" style="top:79.2%; left:73%; z-index:5;">${cvForwardTemp}${unitForKey(
+              "cvForward"
+            )}</div>`
           : ""
       }
 
       ${
         cvReturnTemp !== null
-          ? `<div class="diagram-label" data-key="cvReturn" style="top:94%; left:73%;z-index:5;">${cvReturnTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="cvReturn" style="top:94%; left:73%;z-index:5;">${cvReturnTemp}${unitForKey(
+              "cvReturn"
+            )}</div>`
           : ""
       }
 
@@ -502,6 +535,12 @@ class LvHeatpumpCardEditor extends HTMLElement {
           },
         },
       },
+      // --- Settings ---
+      {
+        name: "show_temp_unit",
+        label: "Show temperature unit (°C/°F)",
+        selector: { boolean: {} },
+      },
     ];
 
     // Advanced: core entities og sensorer (popup-listerne er ikke længere bruger-opsætning)
@@ -612,7 +651,7 @@ class LvHeatpumpCardEditor extends HTMLElement {
         name: "defrost_icon",
         label: "Defrost state (defrost_icon)",
         selector: { entity: { domain: "binary_sensor" } },
-      },
+      },      
     ];
   }
 
