@@ -1,4 +1,4 @@
-name: Build and release DVI LV-X Heatpump Card
+name: Build and release DVI LV Heatpump Card
 
 on:
   push:
@@ -17,9 +17,9 @@ jobs:
       - name: Prepare dist folder
         run: |
           rm -rf dist
-          mkdir -p dist/dvi-lv-x
-          cp dvi-lv-x-heatpump-card.js dist/
-          cp -r dvi-lv-x/* dist/dvi-lv-x/
+          mkdir -p dist/dvi-lv
+          cp dvi-lv-heatpump-card.js dist/
+          cp -r dvi-lv/* dist/dvi-lv/
 
       # # Optional: create a ZIP with the dist contents for manual installs
       # - name: Create ZIP from dist
