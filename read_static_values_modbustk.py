@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Læser FABNR/pumpid direkte fra DVI'en via modbus_tk (som i det gamle projekt)
+Læser FABNR/pumpid og SW-versioner (bot/top) direkte fra DVI'en via modbus_tk
 og skriver resultaterne til:
   - ./config.cfg  (JSON med feltet "pumpid")
   - ./fabnr.cfg   (ren tekst med pumpid)
-  - ./.env        (linje FABNR=<pumpid>)
+  - ./.env        (linjer FABNR=<pumpid>, SWBOT=<x.yz>, SWTOP=<x.yz>)
 Kør dette script på en Pi, der er direkte forbundet til DVI'en (uden STM32-bridge).
 """
 
@@ -23,6 +23,8 @@ MODBUS_PORT = "/dev/ttyACM0"  # samme som ModbusPort i settings.py
 SLAVE_ADDR = 16
 FUNCTION_CODE = 6
 FABNR_ADDR = 153  # register 153
+SWBOT_ADDR = 154
+SWTOP_ADDR = 155
 QUANTITY = 1
 
 # Filer placeres i samme dir som dette script
@@ -109,7 +111,66 @@ def convert_fabnr_to_pumpid(fabnr_seq):
     return fabout
 
 
-def persist_pumpid(pumpid: int):
+def read_sw_version_raw(master, addr):
+    """
+    Genskaber SWBOT/SWTOP læsning:
+      SWBOT = modbusopen(16, 6, 154, 1)  # data_format="BBBBB"
+      SWTOP = modbusopen(16, 6, 155, 1)
+    """
+    out = master.execute(
+        SLAVE_ADDR,
+        FUNCTION_CODE,
+        addr,
+        QUANTITY,
+        data_format="BBBBB",
+        expected_length=10,
+    )
+    return out
+
+
+def convert_sw_to_float(sw_seq):
+    """
+    Samme logik som i checkDVIVersion/getSystemStatusData:
+      SWBOT2 = float(chr(SWBOT[2]) + "." + chr(SWBOT[3]) + chr(SWBOT[4]))
+    """
+    if len(sw_seq) < 5:
+        raise ValueError("SW sequence too short: %r" % (sw_seq,))
+    major = chr(sw_seq[2])
+    minor1 = chr(sw_seq[3])
+    minor2 = chr(sw_seq[4])
+    s = f"{major}.{minor1}{minor2}"
+    return float(s), s  # både float og strengrepræsentation
+
+
+def _update_env_key(key: str, value: str):
+    env_lines = []
+    if os.path.isfile(ENV_PATH):
+        try:
+            with open(ENV_PATH, "r", encoding="utf-8") as f:
+                env_lines = f.readlines()
+        except Exception:
+            env_lines = []
+    new_line = f"{key}={value}\n"
+    written = False
+    out_lines = []
+    for line in env_lines:
+        if line.strip().startswith(f"{key}="):
+            if not written:
+                out_lines.append(new_line)
+                written = True
+        else:
+            out_lines.append(line)
+    if not written:
+        out_lines.append(new_line)
+    try:
+        with open(ENV_PATH, "w", encoding="utf-8") as f:
+            f.writelines(out_lines)
+        print(f"💾 Updated {ENV_PATH} with {key}={value}")
+    except Exception as e:
+        print(f"⚠️ Could not write {ENV_PATH}: {e}")
+
+
+def persist_pumpid(pumpid: int, swbot_str: str | None = None, swtop_str: str | None = None):
     # Skriv fabnr.cfg som ren tekst
     with open(FABNR_PATH, "w", encoding="utf-8") as f:
         f.write(str(pumpid) + "\n")
@@ -130,33 +191,12 @@ def persist_pumpid(pumpid: int):
         json.dump(cfg, f)
     print(f"💾 Stored pumpid in {CONFIG_PATH}: {pumpid}")
 
-    # Opdatér .env med FABNR=<pumpid>
-    env_lines = []
-    if os.path.isfile(ENV_PATH):
-        try:
-            with open(ENV_PATH, "r", encoding="utf-8") as f:
-                env_lines = f.readlines()
-        except Exception:
-            env_lines = []
-    key = "FABNR"
-    new_line = f"{key}={pumpid}\n"
-    written = False
-    out_lines = []
-    for line in env_lines:
-        if line.strip().startswith(f"{key}="):
-            if not written:
-                out_lines.append(new_line)
-                written = True
-        else:
-            out_lines.append(line)
-    if not written:
-        out_lines.append(new_line)
-    try:
-        with open(ENV_PATH, "w", encoding="utf-8") as f:
-            f.writelines(out_lines)
-        print(f"💾 Updated {ENV_PATH} with {key}={pumpid}")
-    except Exception as e:
-        print(f"⚠️ Could not write {ENV_PATH}: {e}")
+    # Opdatér .env med FABNR=<pumpid> (+ SWBOT/SWTOP hvis kendt)
+    _update_env_key("FABNR", str(pumpid))
+    if swbot_str is not None:
+        _update_env_key("SWBOT", swbot_str)
+    if swtop_str is not None:
+        _update_env_key("SWTOP", swtop_str)
 
 
 def main():
@@ -173,10 +213,28 @@ def main():
         print(f"✅ Raw FABNR response: {fabnr_raw!r}")
         pumpid = convert_fabnr_to_pumpid(fabnr_raw)
         print(f"🆔 Computed pumpid from FABNR: {pumpid}")
-        persist_pumpid(pumpid)
+
+        # Læs SWBOT/SWTOP
+        try:
+            swbot_raw = read_sw_version_raw(master, SWBOT_ADDR)
+            swbot_float, swbot_str = convert_sw_to_float(swbot_raw)
+            print(f"🧩 SWBOT raw: {swbot_raw!r} -> {swbot_str} ({swbot_float})")
+        except Exception as e:
+            print(f"⚠️ Failed to read/convert SWBOT: {e}")
+            swbot_str = None
+
+        try:
+            swtop_raw = read_sw_version_raw(master, SWTOP_ADDR)
+            swtop_float, swtop_str = convert_sw_to_float(swtop_raw)
+            print(f"🧩 SWTOP raw: {swtop_raw!r} -> {swtop_str} ({swtop_float})")
+        except Exception as e:
+            print(f"⚠️ Failed to read/convert SWTOP: {e}")
+            swtop_str = None
+
+        persist_pumpid(pumpid, swbot_str, swtop_str)
         print("✅ Done.")
     except Exception as e:
-        print(f"❌ Failed to read/convert FABNR: {e}")
+        print(f"❌ Failed to read/convert FABNR/SW versions: {e}")
         sys.exit(1)
     finally:
         try:
