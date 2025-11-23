@@ -115,7 +115,7 @@ class LvHeatpumpCard extends HTMLElement {
         ? this._hass.states[entityId].attributes.unit_of_measurement || ""
         : "";
 
-    const showUnit = cfg.show_temp_unit !== false; // default: true
+    const showUnit = cfg.show_temp_unit ?? false; // default: true
 
     /* --- read states --- */
 
@@ -494,7 +494,9 @@ class LvHeatpumpCard extends HTMLElement {
 
   static getStubConfig(hass, entities) {
     // Default config used when you add the card from the UI
-    return {};
+    return {
+      show_temp_unit: false,
+    };
   }
 }
 
