@@ -208,11 +208,12 @@ class LvHeatpumpCard extends HTMLElement {
       cvReturn: cfg.cv_return_temp,
     };
 
-    // Map for binary ikon-klik
+    // Map for binary / aux ikon-klik
     const iconEntityMap = {
       defrost: cfg.defrost_icon,
       comp: cfg.comp_icon,
       cvPump: cfg.cv_pump_icon,
+      aux: cfg.aux_heating, // klik på AUX-ikon åbner select-entity
     };
 
     /* --- build diagram --- */
@@ -310,6 +311,18 @@ class LvHeatpumpCard extends HTMLElement {
           : ""
       }
 
+      <!-- AUX icon on buffer tank (only when AUX != Off) -->
+      ${
+        auxHeating && auxHeating !== "Off"
+          ? `<ha-icon
+               class="diagram-element"
+               data-icon-key="aux"
+               style="top:70%; left:69%; color:var(--warning-color, #fdd835);"
+               icon="mdi:lightning-bolt-outline">
+             </ha-icon>`
+          : ""
+      }
+
       <!-- Mode bar: Info / CV / VV / AUX -->
       <div class="mode-bar">
         ${
@@ -386,7 +399,7 @@ class LvHeatpumpCard extends HTMLElement {
       });
     });
 
-    /* --- native HA more-info popup på binary ikoner --- */
+    /* --- native HA more-info popup på binary/AUX ikoner --- */
     Object.entries(iconEntityMap).forEach(([key, entityId]) => {
       if (!entityId) return;
       diagram.querySelectorAll(`[data-icon-key="${key}"]`).forEach((el) => {
