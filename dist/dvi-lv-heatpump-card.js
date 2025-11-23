@@ -783,6 +783,7 @@ class LvHeatpumpCardEditor extends HTMLElement {
     // Popup-lister – bygges helt forfra når vi auto-filler (men er ikke redigerbare i UI)
     const info_entities = [
       patch.em23_energy,
+      patch.em23_power,
       entityIds.find((e) => e.endsWith("_comp_hours")),
       entityIds.find((e) => e.endsWith("_vv_hours")),
       entityIds.find((e) => e.endsWith("_heating_hours")),
