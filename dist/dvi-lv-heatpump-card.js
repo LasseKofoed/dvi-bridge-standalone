@@ -1,4 +1,4 @@
-class LvXHeatpumpCard extends HTMLElement {
+class LvHeatpumpCard extends HTMLElement {
   // Base path for images, regardless of where HACS installs the card
   static get imageBase() {
     return new URL("./dvi-lv/", import.meta.url).href;
@@ -189,70 +189,83 @@ class LvXHeatpumpCard extends HTMLElement {
         ? "var(--secondary-text-color)"
         : "var(--disabled-text-color)";
 
-    // Sikr at popup-lister er arrays (kan være sat af auto-fill eller YAML)
+    // Popup-lister (kan være sat af auto-fill eller YAML)
     const infoEntities = Array.isArray(cfg.info_entities) ? cfg.info_entities : [];
     const cvEntities = Array.isArray(cfg.cv_entities) ? cfg.cv_entities : [];
     const vvEntities = Array.isArray(cfg.vv_entities) ? cfg.vv_entities : [];
     const auxEntities = Array.isArray(cfg.aux_entities) ? cfg.aux_entities : [];
 
+    // Map mellem "keys" og entityId til history-popup
+    const stateEntityMap = {
+      outdoor: cfg.outdoor_temp,
+      curve: cfg.curve_temp,
+      tankCv: cfg.storage_tank_cv,
+      tankVv: cfg.storage_tank_vv,
+      evap: cfg.evaporator_temp,
+      hp: cfg.hp_temp,
+      lp: cfg.lp_temp,
+      cvForward: cfg.cv_forward_temp,
+      cvReturn: cfg.cv_return_temp,
+    };
+
     /* --- build diagram --- */
 
     diagram.innerHTML = `
-      <img src="${LvXHeatpumpCard.imageBase}/dvi.gif" class="diagram-base" alt="LV diagram" />
+      <img src="${LvHeatpumpCard.imageBase}/dvi.gif" class="diagram-base" alt="LV diagram" />
 
       ${
         outdoor !== null
-          ? `<div class="diagram-label" style="top:11%; left:13%;  z-index:5;">${outdoor} °C</div>`
+          ? `<div class="diagram-label" data-key="outdoor" style="top:11%; left:13%;  z-index:5;">${outdoor} °C</div>`
           : ""
       }
 
-      <div class="diagram-label" style="top:18%; left:50%; z-index:5;">kurvetemperatur</div>
+      <div class="diagram-label" style="top:18%; left:50%; z-index:5;">Kurvetemperatur</div>
 
       ${
         curveTemp !== null
-          ? `<div class="diagram-label" style="top:18%; left:68%; z-index:5;">${curveTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="curve" style="top:18%; left:68%; z-index:5;">${curveTemp} °C</div>`
           : ""
       }
 
       ${
         evapTemp !== null
-          ? `<div class="diagram-label" style="top:77%; left:16%; z-index:5;">${evapTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="evap" style="top:77%; left:16%; z-index:5;">${evapTemp} °C</div>`
           : ""
       }
 
       ${
         hpTemp !== null
-          ? `<div class="diagram-label" style="top:31%; left:43.5%; z-index:5;">${hpTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="hp" style="top:31%; left:43.5%; z-index:5;">${hpTemp} °C</div>`
           : ""
       }
 
       ${
         lpTemp !== null
-          ? `<div class="diagram-label" style="top:31%; left:34%; z-index:5;">${lpTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="lp" style="top:31%; left:34%; z-index:5;">${lpTemp} °C</div>`
           : ""
       }
 
       ${
         tankCv !== null
-          ? `<div class="diagram-label" style="top:72.5%; left:61%; z-index:5;">${tankCv} °C</div>`
+          ? `<div class="diagram-label" data-key="tankCv" style="top:72.5%; left:61%; z-index:5;">${tankCv} °C</div>`
           : ""
       }
 
       ${
         tankVv !== null
-          ? `<div class="diagram-label" style="top:33%; left:80%; z-index:5;">${tankVv} °C</div>`
+          ? `<div class="diagram-label" data-key="tankVv" style="top:33%; left:80%; z-index:5;">${tankVv} °C</div>`
           : ""
       }
 
       ${
         cvForwardTemp !== null
-          ? `<div class="diagram-label" style="top:79.2%; left:73%; z-index:5;">${cvForwardTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="cvForward" style="top:79.2%; left:73%; z-index:5;">${cvForwardTemp} °C</div>`
           : ""
       }
 
       ${
         cvReturnTemp !== null
-          ? `<div class="diagram-label" style="top:94%; left:73%;z-index:5;">${cvReturnTemp} °C</div>`
+          ? `<div class="diagram-label" data-key="cvReturn" style="top:94%; left:73%;z-index:5;">${cvReturnTemp} °C</div>`
           : ""
       }
 
@@ -260,20 +273,20 @@ class LvXHeatpumpCard extends HTMLElement {
       <div class="diagram-icon" style="top:79.3%; left:88.8%; width:21%; opacity:${onOpacity(
         cvPumpState
       )};">
-        <img src="${LvXHeatpumpCard.imageBase}CV_on.gif" alt="CV pump" />
+        <img src="${LvHeatpumpCard.imageBase}CV_on.gif" alt="CV pump" />
       </div>
       <div class="diagram-icon" style="top:89.95%; left:71.7%; width:14.2%; opacity:${onOpacity(
         cvPumpState
       )};">
-        <img src="${LvXHeatpumpCard.imageBase}CVflow_on.gif" alt="CV flow" />
+        <img src="${LvHeatpumpCard.imageBase}CVflow_on.gif" alt="CV flow" />
       </div>
 
       <!-- Compressor / HP gifs -->
       <div class="diagram-icon" style="top:63.75%; left:18.4%; width:33.9%; opacity:${compState === "on" ? 1 : 0.0};">
-        <img src="${LvXHeatpumpCard.imageBase}HP_on.gif" alt="HP on" />
+        <img src="${LvHeatpumpCard.imageBase}HP_on.gif" alt="HP on" />
       </div>
       <div class="diagram-icon" style="top:63.75%; left:46%; width:21.3%; opacity:${compState === "on" ? 1 : 0.0};">
-        <img src="${LvXHeatpumpCard.imageBase}COMP_on.gif" alt="Compressor on" />
+        <img src="${LvHeatpumpCard.imageBase}COMP_on.gif" alt="Compressor on" />
       </div>
 
       <!-- Defrost icon (snowflake) -->
@@ -348,6 +361,23 @@ class LvXHeatpumpCard extends HTMLElement {
       </div>
     `;
 
+    /* --- native HA history popup på labels --- */
+    Object.entries(stateEntityMap).forEach(([key, entityId]) => {
+      if (!entityId) return;
+      const el = diagram.querySelector(`.diagram-label[data-key="${key}"]`);
+      if (!el) return;
+
+      el.style.cursor = "pointer";
+      el.addEventListener("click", () => {
+        const ev = new CustomEvent("hass-more-info", {
+          detail: { entityId },
+          bubbles: true,
+          composed: true,
+        });
+        this.dispatchEvent(ev);
+      });
+    });
+
     /* --- browser_mod popups for chips --- */
 
     const firePopup = (type) => {
@@ -389,7 +419,7 @@ class LvXHeatpumpCard extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement("lvx-heatpump-card-editor");
+    return document.createElement("lv-heatpump-card-editor");
   }
 
   static getStubConfig(hass, entities) {
@@ -400,7 +430,7 @@ class LvXHeatpumpCard extends HTMLElement {
 
 /* ------------------ EDITOR ------------------ */
 
-class LvXHeatpumpCardEditor extends HTMLElement {
+class LvHeatpumpCardEditor extends HTMLElement {
   constructor() {
     super();
     this._config = {};
@@ -722,18 +752,16 @@ class LvXHeatpumpCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("lvx-heatpump-card-editor", LvXHeatpumpCardEditor);
-
-
+customElements.define("lv-heatpump-card-editor", LvHeatpumpCardEditor);
 
 // Register card in the Lovelace card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "lvx-heatpump-card",
+  type: "lv-heatpump-card",
   name: "DVI LV Heatpump Card",
   description: "Visual overview and control panel for a DVI LV heatpump.",
   preview: true, // gør at det dukker op under "Custom cards"
   documentationURL: "https://github.com/ruteclrp/dvi-bridge-standalone",
 });
 
-customElements.define("lvx-heatpump-card", LvXHeatpumpCard);
+customElements.define("lv-heatpump-card", LvHeatpumpCard);
