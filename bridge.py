@@ -47,9 +47,9 @@ MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 # Get heatpump model from environment variable
-HEATPUMP_MODEL = os.getenv("HEATPUMP_MODEL", "LVx")
-if HEATPUMP_MODEL == "LVx":
-    print("⚠️ HEATPUMP_MODEL not set in .env, using placeholder LVx")
+HEATPUMP_MODEL = os.getenv("HEATPUMP_MODEL", "LV")
+if HEATPUMP_MODEL == "LV":
+    print("⚠️ HEATPUMP_MODEL not set in .env, using placeholder LV")
 
 # MQTT setup
 mqtt_client = mqtt.Client()

@@ -25,12 +25,12 @@
       # - name: Create ZIP from dist
       #   run: |
       #     cd dist
-      #     zip -r ../dvi-lv-x-heatpump-card.js.zip .
+      #     zip -r ../dvi-lv-heatpump-card.js.zip .
 
       # - name: Create GitHub Release
       #   uses: softprops/action-gh-release@v2
       #   with:
       #     files: |
-      #       dvi-lv-x-heatpump-card.js.zip
+      #       dvi-lv-heatpump-card.js.zip
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
