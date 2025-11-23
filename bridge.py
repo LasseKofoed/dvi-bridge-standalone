@@ -420,6 +420,8 @@ mode_options = {
                                  "Radiator and mixed systems"]
 }
 
+time.sleep(2)  # give HA a chance to subscribe
+
 for reg, label in fc06_registers.items():
     try:
         if label in mode_options:
