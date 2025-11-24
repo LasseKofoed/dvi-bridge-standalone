@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Læser FABNR/pumpid og SW-versioner (bot/top) direkte fra DVI'en via modbus_tk
-og skriver resultaterne til:
+Læser FABNR/pumpid, SW-versioner (bot/top) og datoer (install/service)
+direkte fra DVI'en via modbus_tk og skriver resultaterne til:
   - ./config.cfg  (JSON med feltet "pumpid")
   - ./fabnr.cfg   (ren tekst med pumpid)
-  - ./.env        (linjer FABNR=<pumpid>, SWBOT=<x.yz>, SWTOP=<x.yz>)
+  - ./.env        (linjer FABNR=<pumpid>, SWBOT=<x.yz>, SWTOP=<x.yz>,
+                   SERVICE_DD, SERVICE_MM, SERVICE_YY)
 Kør dette script på en Pi, der er direkte forbundet til DVI'en (uden STM32-bridge).
 """
 
@@ -25,6 +26,8 @@ FUNCTION_CODE = 6
 FABNR_ADDR = 153  # register 153
 SWBOT_ADDR = 154
 SWTOP_ADDR = 155
+INDA_ADDR = 151  # installation date (INDA)
+SEDA_ADDR = 152  # service date (SEDA)
 QUANTITY = 1
 
 # Filer placeres i samme dir som dette script
@@ -170,33 +173,98 @@ def _update_env_key(key: str, value: str):
         print(f"⚠️ Could not write {ENV_PATH}: {e}")
 
 
-def persist_pumpid(pumpid: int, swbot_str: str | None = None, swtop_str: str | None = None):
-    # Skriv fabnr.cfg som ren tekst
-    with open(FABNR_PATH, "w", encoding="utf-8") as f:
-        f.write(str(pumpid) + "\n")
-    print(f"💾 Wrote FABNR to {FABNR_PATH}: {pumpid}")
+def read_date_raw(master, addr):
+    """
+    Læser INDA/SEDA som i gammel kode:
+      INDA = modbusopen(16, 6, 151, 1)  # data_format="BBBBB"
+      SEDA = modbusopen(16, 6, 152, 1)
+    Layout: [slave, func, DD, MM, YY, ...]
+    """
+    out = master.execute(
+        SLAVE_ADDR,
+        FUNCTION_CODE,
+        addr,
+        QUANTITY,
+        data_format="BBBBB",
+        expected_length=10,
+    )
+    return out
 
-    # Skriv/merge config.cfg som JSON
-    cfg = {}
-    if os.path.isfile(CONFIG_PATH):
+
+def convert_date_to_dict(date_seq):
+    """
+    Konverterer [slave, func, DD, MM, YY, ...] til dict:
+      {"DD": int, "MM": int, "YY": int}
+    """
+    if len(date_seq) < 5:
+        raise ValueError("Date sequence too short: %r" % (date_seq,))
+    dd = int(date_seq[2])
+    mm = int(date_seq[3])
+    yy = int(date_seq[4])
+    return {"DD": dd, "MM": mm, "YY": yy}
+
+
+def persist_static_values(
+    pumpid: int,
+    swbot_str: str | None = None,
+    swtop_str: str | None = None,
+    install_date: dict | None = None,
+    service_date: dict | None = None,
+):
+    # Skriv fabnr.cfg som ren tekst (kun hvis FABNR ikke allerede findes i .env)
+    env_fabnr = None
+    if os.path.isfile(ENV_PATH):
         try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+            with open(ENV_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip().startswith("FABNR="):
+                        env_fabnr = line.strip().split("=", 1)[1]
+                        break
         except Exception:
-            cfg = {}
-    cfg["pumpid"] = pumpid
-    if "accesstoken" not in cfg:
-        cfg["accesstoken"] = ""
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(cfg, f)
-    print(f"💾 Stored pumpid in {CONFIG_PATH}: {pumpid}")
+            env_fabnr = None
 
-    # Opdatér .env med FABNR=<pumpid> (+ SWBOT/SWTOP hvis kendt)
-    _update_env_key("FABNR", str(pumpid))
+    if env_fabnr is None:
+        with open(FABNR_PATH, "w", encoding="utf-8") as f:
+            f.write(str(pumpid) + "\n")
+        print(f"💾 Wrote FABNR to {FABNR_PATH}: {pumpid}")
+
+        # Skriv/merge config.cfg som JSON
+        cfg = {}
+        if os.path.isfile(CONFIG_PATH):
+            try:
+                with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except Exception:
+                cfg = {}
+        cfg["pumpid"] = pumpid
+        if "accesstoken" not in cfg:
+            cfg["accesstoken"] = ""
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f)
+        print(f"💾 Stored pumpid in {CONFIG_PATH}: {pumpid}")
+
+        # Kun hvis FABNR ikke fandtes i .env, sæt FABNR=<pumpid>
+        _update_env_key("FABNR", str(pumpid))
+    else:
+        print(f"ℹ️ FABNR already present in .env ({env_fabnr}), not overwriting.")
+
+    # SWBOT/SWTOP opdateres altid i .env (de kan ændres ved firmwareopdatering)
     if swbot_str is not None:
         _update_env_key("SWBOT", swbot_str)
     if swtop_str is not None:
         _update_env_key("SWTOP", swtop_str)
+
+    # Installationsdato: INSTALL_DD / INSTALL_MM / INSTALL_YY
+    if install_date is not None:
+        _update_env_key("INSTALL_DD", str(install_date["DD"]))
+        _update_env_key("INSTALL_MM", str(install_date["MM"]))
+        _update_env_key("INSTALL_YY", str(install_date["YY"]))
+
+    # Service-dato: SERVICE_DD / SERVICE_MM / SERVICE_YY
+    if service_date is not None:
+        _update_env_key("SERVICE_DD", str(service_date["DD"]))
+        _update_env_key("SERVICE_MM", str(service_date["MM"]))
+        _update_env_key("SERVICE_YY", str(service_date["YY"]))
 
 
 def main():
@@ -209,12 +277,14 @@ def main():
 
     try:
         time.sleep(0.5)
+
+        # FABNR
         fabnr_raw = read_fabnr_raw(master)
         print(f"✅ Raw FABNR response: {fabnr_raw!r}")
         pumpid = convert_fabnr_to_pumpid(fabnr_raw)
         print(f"🆔 Computed pumpid from FABNR: {pumpid}")
 
-        # Læs SWBOT/SWTOP
+        # SWBOT/SWTOP
         try:
             swbot_raw = read_sw_version_raw(master, SWBOT_ADDR)
             swbot_float, swbot_str = convert_sw_to_float(swbot_raw)
@@ -231,10 +301,28 @@ def main():
             print(f"⚠️ Failed to read/convert SWTOP: {e}")
             swtop_str = None
 
-        persist_pumpid(pumpid, swbot_str, swtop_str)
+        # Install date (INDA)
+        try:
+            inda_raw = read_date_raw(master, INDA_ADDR)
+            install_date = convert_date_to_dict(inda_raw)
+            print(f"📅 INDA raw: {inda_raw!r} -> {install_date}")
+        except Exception as e:
+            print(f"⚠️ Failed to read/convert INDA: {e}")
+            install_date = None
+
+        # Service date (SEDA)
+        try:
+            seda_raw = read_date_raw(master, SEDA_ADDR)
+            service_date = convert_date_to_dict(seda_raw)
+            print(f"📅 SEDA raw: {seda_raw!r} -> {service_date}")
+        except Exception as e:
+            print(f"⚠️ Failed to read/convert SEDA: {e}")
+            service_date = None
+
+        persist_static_values(pumpid, swbot_str, swtop_str, install_date, service_date)
         print("✅ Done.")
     except Exception as e:
-        print(f"❌ Failed to read/convert FABNR/SW versions: {e}")
+        print(f"❌ Failed to read/convert static values: {e}")
         sys.exit(1)
     finally:
         try:

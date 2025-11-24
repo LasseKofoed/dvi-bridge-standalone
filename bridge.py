@@ -10,6 +10,7 @@ import threading
 import warnings
 import glob
 import subprocess
+from typing import Optional
 
 # Find STM32 Virtual COM Port automatically
 devices = glob.glob("/dev/serial/by-id/*STM32*")
@@ -25,7 +26,6 @@ load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Pump ID / FABNR + SW-versioner from environment (written by read_static_values_modbustk.py)
-from typing import Optional
 
 def _ensure_pump_id() -> Optional[str]:
     """
@@ -43,7 +43,6 @@ def _ensure_pump_id() -> Optional[str]:
 
     print("ℹ️ No FABNR in .env, attempting to read via read_static_values_modbustk.py ...")
     try:
-        # Kør scriptet som separat proces, så modbus_tk/minimalmodbus ikke blandes i samme interpreter
         result = subprocess.run(
             [sys.executable, script_path],
             cwd=os.path.dirname(script_path),
@@ -57,7 +56,7 @@ def _ensure_pump_id() -> Optional[str]:
             if result.stderr:
                 print(result.stderr, end="")
         else:
-            # Scriptet opdaterer .env; reload og læs FABNR igen
+            # Scriptet opdaterer .env; reload og læs FABNR/SW/SERVICE igen
             load_dotenv(override=True)
     except Exception as e:
         print(f"⚠️ Failed to run read_static_values_modbustk.py: {e}")
@@ -67,6 +66,12 @@ def _ensure_pump_id() -> Optional[str]:
 PUMP_ID: Optional[str] = _ensure_pump_id()
 SWBOT: Optional[str] = os.getenv("SWBOT") or None
 SWTOP: Optional[str] = os.getenv("SWTOP") or None
+INSTALL_DD: Optional[str] = os.getenv("INSTALL_DD") or None
+INSTALL_MM: Optional[str] = os.getenv("INSTALL_MM") or None
+INSTALL_YY: Optional[str] = os.getenv("INSTALL_YY") or None
+SERVICE_DD: Optional[str] = os.getenv("SERVICE_DD") or None
+SERVICE_MM: Optional[str] = os.getenv("SERVICE_MM") or None
+SERVICE_YY: Optional[str] = os.getenv("SERVICE_YY") or None
 
 if PUMP_ID:
     print(f"🆔 Fabrication ID set to: {PUMP_ID}")
@@ -77,6 +82,16 @@ if SWBOT or SWTOP:
     print(f"ℹ️ SW versions from .env: SWBOT={SWBOT or 'unknown'}, SWTOP={SWTOP or 'unknown'}")
 else:
     print("ℹ️ No SWBOT/SWTOP set in .env")
+
+if INSTALL_DD and INSTALL_MM and INSTALL_YY:
+    print(f"ℹ️ Install date from .env: {INSTALL_DD}-{INSTALL_MM}-{INSTALL_YY}")
+else:
+    print("ℹ️ No install date (INDA) set in .env")
+
+if SERVICE_DD and SERVICE_MM and SERVICE_YY:
+    print(f"ℹ️ Service date from .env: {SERVICE_DD}-{SERVICE_MM}-{SERVICE_YY}")
+else:
+    print("ℹ️ No service date (SEDA) set in .env")
 
 # Modbus setup
 instrument = minimalmodbus.Instrument(serial_port, 0x10)
@@ -109,14 +124,6 @@ mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
 # Only set username/password if both are provided (support brokers with no auth)
 if MQTT_USER and MQTT_PASS:
     mqtt_client.username_pw_set(MQTT_USER, MQTT_PASS)
-
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        print("✅ Connected to MQTT broker")
-        for t in command_map:
-            client.subscribe(t)
-    else:
-        print(f"❌ MQTT connection failed with code {rc}")
 
 def _build_device_info() -> dict:
     device = {
@@ -367,63 +374,6 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"❌ Command handling failed for {msg.topic}: {e}")
 
-mqtt_client.on_connect = on_connect
-for t in command_map:
-    mqtt_client.subscribe(t)
-mqtt_client.on_message = on_message
-
-# Timers and persistent cache
-last_coil_update = 0
-last_fc04_update = 0
-last_misc_update = 0
-
-last_coils = {}
-last_inputs = {}
-last_writes = {}
-last_published = None
-
-mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
-mqtt_client.loop_start()
-
-# --- Auto-generate discovery configs once at startup ---
-
-# Coils -> binary_sensors
-for idx, label in coil_names.items():
-    publish_discovery_binary(
-        name=label,
-        unique_id=f"dvi_coil_{idx}",
-        coil_key=label
-    )
-
-# FC04 sensors -> temperature sensors
-for key, label in fc04_labels.items():
-    publish_discovery_sensor(
-        name=label,
-        unique_id=f"dvi_fc04_{key}",
-        value_template=f"{{{{ value_json.input_registers['{label}'] }}}}",
-        unit="°C",
-        device_class="temperature",
-        state_class="measurement"
-    )
-
-# Special FC04 cases
-publish_discovery_sensor(
-    name="em23_power",
-    unique_id="dvi_fc04_power",
-    value_template="{{ value_json.input_registers['em23_power'] | float | round(3) }}",
-    unit="kW",
-    device_class="power",
-    state_class="measurement"
-)
-publish_discovery_sensor(
-    name="em23_energy",
-    unique_id="dvi_fc04_energy",
-    value_template="{{ value_json.input_registers['em23_energy'] }}",
-    unit="kWh",
-    device_class="energy",
-    state_class="total_increasing"
-)
-
 # --- FC06 registers discovery ---
 
 fc06_registers = {
@@ -470,164 +420,238 @@ mode_options = {
     "aux_heating": ["Off", "Automatic", "On"],
     "central_heating_config": ["Under floor heating w/o shunt",
                                "Under floor heating w. shunt",
-                                 "Radiator and mixed systems"]
+                               "Radiator and mixed systems"]
 }
 
-for reg, label in fc06_registers.items():
-    try:
-        if label in mode_options:
-            cmd_topic = {
-                "cv_mode": "dvi/command/cvstate",
-                "cv_night": "dvi/command/cvnight",
-                "vv_mode": "dvi/command/vvstate",
-                "vv_schedule": "dvi/command/vvschedule",
-                "aux_heating": "dvi/command/tvstate",
-                "central_heating_config": "dvi/command/centralheatingconfig"
-            }[label]
+# --- Samlet discovery-funktion (placeret EFTER fc06_registers/special_fc06/mode_options) ---
 
-            # Build mapping dict for Jinja
-            mapping = {
-                "cv_mode": {0: "Off", 1: "On"},
-                "cv_night": {0: "Timer", 1: "Constant day", 2: "Constant night"},
-                "vv_mode": {0: "Off", 1: "On"},
-                "vv_schedule": {0: "Timer", 1: "Constant on", 2: "Constant off"},
-                "aux_heating": {0: "Off", 1: "Automatic", 2: "On"},
-                "central_heating_config": {
-                    0: "Under floor heating w/o shunt",
-                    1: "Under floor heating w. shunt",
-                    2: "Radiator and mixed systems"
-                }
-            }[label]
+def publish_all_discovery() -> None:
+    """Publish alle Home Assistant discovery configs (kaldes ved hver MQTT connect)."""
 
-            # Only central_heating_config gets entity_category="config"
-            if label == "central_heating_config":
-                publish_discovery_select(
+    # Coils -> binary_sensors
+    for idx, label in coil_names.items():
+        publish_discovery_binary(
+            name=label,
+            unique_id=f"dvi_coil_{idx}",
+            coil_key=label
+        )
+
+    # FC04 sensors -> temperature sensors
+    for key, label in fc04_labels.items():
+        publish_discovery_sensor(
+            name=label,
+            unique_id=f"dvi_fc04_{key}",
+            value_template=f"{{{{ value_json.input_registers['{label}'] }}}}",
+            unit="°C",
+            device_class="temperature",
+            state_class="measurement"
+        )
+
+    # Special FC04 cases
+    publish_discovery_sensor(
+        name="em23_power",
+        unique_id="dvi_fc04_power",
+        value_template="{{ value_json.input_registers['em23_power'] | float | round(3) }}",
+        unit="kW",
+        device_class="power",
+        state_class="measurement"
+    )
+    publish_discovery_sensor(
+        name="em23_energy",
+        unique_id="dvi_fc04_energy",
+        value_template="{{ value_json.input_registers['em23_energy'] }}",
+        unit="kWh",
+        device_class="energy",
+        state_class="total_increasing"
+    )
+
+    # Install / service date as diagnostic sensors
+    publish_discovery_sensor(
+        name="Installation Date",
+        unique_id="dvi_static_install_date",
+        value_template="{{ '%s-%s-%s' | format(value_json.install_date.dd, value_json.install_date.mm, value_json.install_date.yy) }}",
+        entity_category="diagnostic"
+    )
+    publish_discovery_sensor(
+        name="Service Date",
+        unique_id="dvi_static_service_date",
+        value_template="{{ '%s-%s-%s' | format(value_json.service_date.dd, value_json.service_date.mm, value_json.service_date.yy) }}",
+        entity_category="diagnostic"
+    )
+
+    # FC06 discovery
+    for reg, label in fc06_registers.items():
+        try:
+            if label in mode_options:
+                cmd_topic = {
+                    "cv_mode": "dvi/command/cvstate",
+                    "cv_night": "dvi/command/cvnight",
+                    "vv_mode": "dvi/command/vvstate",
+                    "vv_schedule": "dvi/command/vvschedule",
+                    "aux_heating": "dvi/command/tvstate",
+                    "central_heating_config": "dvi/command/centralheatingconfig"
+                }[label]
+
+                mapping = {
+                    "cv_mode": {0: "Off", 1: "On"},
+                    "cv_night": {0: "Timer", 1: "Constant day", 2: "Constant night"},
+                    "vv_mode": {0: "Off", 1: "On"},
+                    "vv_schedule": {0: "Timer", 1: "Constant on", 2: "Constant off"},
+                    "aux_heating": {0: "Off", 1: "Automatic", 2: "On"},
+                    "central_heating_config": {
+                        0: "Under floor heating w/o shunt",
+                        1: "Under floor heating w. shunt",
+                        2: "Radiator and mixed systems"
+                    }
+                }[label]
+
+                if label == "central_heating_config":
+                    publish_discovery_select(
+                        name=label,
+                        unique_id=f"dvi_fc06_{label}",
+                        command_topic=cmd_topic,
+                        state_template=f"""
+                          {{% set map = {mapping} %}}
+                          {{{{ map[value_json.write_registers['{label}']] }}}}
+                        """,
+                        options=mode_options[label],
+                        entity_category="config"
+                    )
+                else:
+                    publish_discovery_select(
+                        name=label,
+                        unique_id=f"dvi_fc06_{label}",
+                        command_topic=cmd_topic,
+                        state_template=f"""
+                          {{% set map = {mapping} %}}
+                          {{{{ map[value_json.write_registers['{label}']] }}}}
+                        """,
+                        options=mode_options[label]
+                   )
+                print(f"🟢 Published select discovery: {label} -> {cmd_topic}")
+
+            elif label == "cv_curve":
+                publish_discovery_number(
                     name=label,
                     unique_id=f"dvi_fc06_{label}",
-                    command_topic=cmd_topic,
-                    state_template=f"""
-                      {{% set map = {mapping} %}}
-                      {{{{ map[value_json.write_registers['{label}']] }}}}
-                    """,
-                    options=mode_options[label],
-                    entity_category="config"   # <-- only here
+                    command_topic="dvi/command/cvcurve",
+                    state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                    min_val=1,
+                    max_val=20,
+                    step=1
                 )
-            else:
-                publish_discovery_select(
+                print(f"🟢 Published number discovery: {label} -> dvi/command/cvcurve")
+
+            elif label == "vv_setpoint":
+                publish_discovery_number(
                     name=label,
                     unique_id=f"dvi_fc06_{label}",
-                    command_topic=cmd_topic,
-                    state_template=f"""
-                      {{% set map = {mapping} %}}
-                      {{{{ map[value_json.write_registers['{label}']] }}}}
-                    """,
-                    options=mode_options[label]
-               )
-            print(f"🟢 Published select discovery: {label} -> {cmd_topic}")
-        
-        # Numeric writable registers -> Numbers
-        elif label == "cv_curve":
-            publish_discovery_number(
-                name=label,
-                unique_id=f"dvi_fc06_{label}",
-                command_topic="dvi/command/cvcurve",
-                state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                min_val=1,
-                max_val=20,
-                step=1
-            )
-            print(f"🟢 Published number discovery: {label} -> dvi/command/cvcurve")
+                    command_topic="dvi/command/vvsetpoint",
+                    state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                    min_val=10,
+                    max_val=60,
+                    step=1,
+                    unit="°C"
+                )
+                print(f"🟢 Published number discovery: {label} -> dvi/command/vvsetpoint")
 
-        elif label == "vv_setpoint":
-            publish_discovery_number(
-                name=label,
-                unique_id=f"dvi_fc06_{label}",
-                command_topic="dvi/command/vvsetpoint",
-                state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                min_val=10,
-                max_val=60,
-                step=1,
-                unit="°C"
-            )
-            print(f"🟢 Published number discovery: {label} -> dvi/command/vvsetpoint")
+            elif label == "curve_temp":
+                publish_discovery_sensor(
+                    name=label,
+                    unique_id=f"dvi_fc06_{label}",
+                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                    unit="°C",
+                    device_class="temperature",
+                    state_class="measurement"
+                )
+                print(f"🟢 Published sensor discovery: {label}")
 
-        # Read-only FC06 sensors
-        elif label == "curve_temp":
-            publish_discovery_sensor(
-                name=label,
-                unique_id=f"dvi_fc06_{label}",
-                value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                unit="°C",
-                device_class="temperature",
-                state_class="measurement"
-            )
-            print(f"🟢 Published sensor discovery: {label}")
+            elif label == "cv_setpoint":
+                publish_discovery_sensor(
+                    name=label,
+                    unique_id=f"dvi_fc06_{label}",
+                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                    unit="°C",
+                    device_class="temperature",
+                    state_class="measurement"
+                )
+                print(f"🟢 Published sensor discovery: {label}")
 
-        elif label == "cv_setpoint":
-            publish_discovery_sensor(
-                name=label,
-                unique_id=f"dvi_fc06_{label}",
-                value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                unit="°C",
-                device_class="temperature",
-                state_class="measurement"
-            )
-            print(f"🟢 Published sensor discovery: {label}")
+            elif label in special_fc06:
+                cfg = special_fc06[label]
+                publish_discovery_sensor(
+                    name=label,
+                    unique_id=f"dvi_fc06_{label}",
+                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                    unit=cfg.get("unit"),
+                    device_class=cfg.get("device_class"),
+                    state_class=cfg.get("state_class")
+                )
+                print(f"🟢 Published sensor discovery: {label}")
 
-        # special case fc06 long term statistics sensors
-        elif label in special_fc06:
-            cfg = special_fc06[label]
-            publish_discovery_sensor(
-                name=label,
-                unique_id=f"dvi_fc06_{label}",
-                value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                unit=cfg.get("unit"),
-                device_class=cfg.get("device_class"),
-                state_class=cfg.get("state_class")
-            )
-            print(f"🟢 Published sensor discovery: {label}")
+            else:
+                publish_discovery_sensor(
+                    name=label,
+                    unique_id=f"dvi_fc06_{label}",
+                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                    state_class="measurement"
+                )
+                print(f"🟢 Published sensor discovery: {label}")
 
-        # Read-only registers -> Sensors
-        else:
-            publish_discovery_sensor(
-                name=label,
-                unique_id=f"dvi_fc06_{label}",
-                value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                state_class="measurement"
-            )
-            print(f"🟢 Published sensor discovery: {label}")
+        except Exception as e:
+            print(f"⚠️ Discovery generation failed for {label}: {e}")
 
-    except Exception as e:
-        print(f"⚠️ Discovery generation failed for {label}: {e}")
+    publish_discovery_number(
+        name="curve_set_-12",
+        unique_id="dvi_fc06_curve_set_-12",
+        command_topic="dvi/command/curveset-12",
+        state_template="{{ value_json.write_registers['curve_set_-12'] }}",
+        min_val=10,
+        max_val=80,
+        step=1,
+        entity_category="config"
+    )
+    print("🟢 Published number discovery: curve_set_-12 -> dvi/command/curveset-12")
 
-# Explicit discovery for dynamic curve-set numbers
-publish_discovery_number(
-    name="curve_set_-12",
-    unique_id="dvi_fc06_curve_set_-12",
-    command_topic="dvi/command/curveset-12",
-    state_template="{{ value_json.write_registers['curve_set_-12'] }}",
-    min_val=10,
-    max_val=80,
-    step=1,
-#    unit="°C",
-    entity_category="config"
-)
-print("🟢 Published number discovery: curve_set_-12 -> dvi/command/curveset-12")
+    publish_discovery_number(
+        name="curve_set_12",
+        unique_id="dvi_fc06_curve_set_12",
+        command_topic="dvi/command/curveset12",
+        state_template="{{ value_json.write_registers['curve_set_12'] }}",
+        min_val=10,
+        max_val=80,
+        step=1,
+        entity_category="config"
+    )
+    print("🟢 Published number discovery: curve_set_12 -> dvi/command/curveset12")
 
-publish_discovery_number(
-    name="curve_set_12",
-    unique_id="dvi_fc06_curve_set_12",
-    command_topic="dvi/command/curveset12",
-    state_template="{{ value_json.write_registers['curve_set_12'] }}",
-    min_val=10,
-    max_val=80,
-    step=1,
-#    unit="°C",
-    entity_category="config"
-)
-print("🟢 Published number discovery: curve_set_12 -> dvi/command/curveset12")
 
-# Main loop
+# --- MQTT callbacks (EFTER publish_all_discovery er defineret) --------------
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("✅ Connected to MQTT broker")
+        for t in command_map:
+            client.subscribe(t)
+        publish_all_discovery()
+    else:
+        print(f"❌ MQTT connection failed with code {rc}")
+
+mqtt_client.on_connect = on_connect
+for t in command_map:
+    mqtt_client.subscribe(t)
+mqtt_client.on_message = on_message
+
+# Timers and persistent cache
+last_coil_update = 0
+last_fc04_update = 0
+last_misc_update = 0
+
+last_coils = {}
+last_inputs = {}
+last_writes = {}
+last_published = None
+
 mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
 mqtt_client.loop_start()
 
@@ -726,13 +750,25 @@ while True:
         "input_registers": dict(sorted(last_inputs.items())),
         "write_registers": dict(sorted(last_writes.items()))
     }
-    # Eksponér pumpid og SW-versioner i measurement payload
+    # Eksponér pumpid, SW-versioner + install/service date i measurement payload
     if PUMP_ID:
         full_payload["pumpid"] = PUMP_ID
     if SWBOT:
         full_payload["sw_bot"] = SWBOT
     if SWTOP:
         full_payload["sw_top"] = SWTOP
+    if INSTALL_DD and INSTALL_MM and INSTALL_YY:
+        full_payload["install_date"] = {
+            "dd": INSTALL_DD,
+            "mm": INSTALL_MM,
+            "yy": INSTALL_YY,
+        }
+    if SERVICE_DD and SERVICE_MM and SERVICE_YY:
+        full_payload["service_date"] = {
+            "dd": SERVICE_DD,
+            "mm": SERVICE_MM,
+            "yy": SERVICE_YY,
+        }
 
     # Only publish if payload changed
     if full_payload != last_published:
