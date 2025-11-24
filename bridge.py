@@ -10,6 +10,7 @@ import threading
 import warnings
 import glob
 import subprocess
+import socket  # <-- nødvendig til _get_default_gateway_linux
 from typing import Optional
 
 # Find STM32 Virtual COM Port automatically
@@ -642,6 +643,105 @@ for t in command_map:
     mqtt_client.subscribe(t)
 mqtt_client.on_message = on_message
 
+# --- Netværksinfo helpers (replikeret fra functions.py) ---------------------
+
+def _get_default_gateway_linux() -> list[str]:
+    """Returnerer gateway som liste [a,b,c,d] eller ['0','0','0','0'] ved fejl."""
+    try:
+        with open("/proc/net/route") as fh:
+            for line in fh:
+                fields = line.strip().split()
+                # iface, destination, flags etc.
+                if fields[1] != '00000000' or not int(fields[3], 16) & 2:
+                    continue
+                g = socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
+                parts = g.split(".")
+                if len(parts) == 4:
+                    print(f"ℹ️ Detected default gateway from /proc/net/route: {g}")
+                    return parts
+    except Exception as e:
+        print(f"⚠️ Failed to read default gateway: {e}")
+    return ["0", "0", "0", "0"]
+
+
+def _get_default_dns_linux() -> list[str]:
+    """Returnerer DNS som liste [a,b,c,d] eller ['0','0','0','0'] ved fejl."""
+    try:
+        data = subprocess.check_output(
+            "cat /etc/resolv.conf | grep -im 1 '^nameserver' | cut -d ' ' -f2",
+            shell=True,
+        ).decode("utf-8").strip()
+        if not data:
+            data = "0.0.0.0"
+    except Exception as e:
+        print(f"⚠️ Failed to read DNS from /etc/resolv.conf: {e}")
+        data = "0.0.0.0"
+    parts = data.split(".")
+    if len(parts) != 4:
+        return ["0", "0", "0", "0"]
+    return parts
+
+
+def _get_ip_address_first_if() -> list[str]:
+    """Returnerer første IP som liste [a,b,c,d] eller ['0','0','0','0']."""
+    try:
+        g = subprocess.check_output("hostname -I", shell=True).decode("utf-8").strip()
+        if not g:
+            g = "0.0.0.0"
+    except Exception as e:
+        print(f"⚠️ Failed to read IP address via hostname -I: {e}")
+        g = "0.0.0.0"
+    parts = g.split()
+    if not parts:
+        return ["0", "0", "0", "0"]
+    ip = parts[0].split(".")
+    if len(ip) != 4:
+        return ["0", "0", "0", "0"]
+    return ip
+
+
+def _push_network_config_to_modbus() -> None:
+    """
+    Skriv IP, gateway og DNS til Modbus registre 211–222 samt netstatus til 466,
+    som i functions.py:setIP/setNetOn.
+    """
+    ip = _get_ip_address_first_if()
+    gw = _get_default_gateway_linux()
+    dns = _get_default_dns_linux()
+
+    print(f"ℹ️ Network info: IP={'.'.join(ip)}, GW={'.'.join(gw)}, DNS={'.'.join(dns)}")
+
+    try:
+        # IP: 211–214
+        write_fc06(211, int(ip[0]))
+        write_fc06(212, int(ip[1]))
+        write_fc06(213, int(ip[2]))
+        write_fc06(214, int(ip[3]))
+
+        # Gateway: 215–218
+        write_fc06(215, int(gw[0]))
+        write_fc06(216, int(gw[1]))
+        write_fc06(217, int(gw[2]))
+        write_fc06(218, int(gw[3]))
+
+        # DNS: 219–222
+        write_fc06(219, int(dns[0]))
+        write_fc06(220, int(dns[1]))
+        write_fc06(221, int(dns[2]))
+        write_fc06(222, int(dns[3]))
+
+        print("✅ Wrote IP/gateway/DNS to Modbus (regs 211–222)")
+    except Exception as e:
+        print(f"❌ Failed to push network config to Modbus: {e}")
+
+    try:
+        # Netværksstatus: 466, værdi 1 (on), svarer til setNetOn i functions.py
+        write_fc06(466, 1)
+        print("✅ Set network status ON in Modbus (reg 466)")
+    except Exception as e:
+        print(f"❌ Failed to set network status in Modbus: {e}")
+
+
 # Timers and persistent cache
 last_coil_update = 0
 last_fc04_update = 0
@@ -652,8 +752,12 @@ last_inputs = {}
 last_writes = {}
 last_published = None
 
+# Start MQTT and push net config once at startup
 mqtt_client.connect(MQTT_HOST, MQTT_PORT, 60)
 mqtt_client.loop_start()
+
+# Skriv IP/gateway/DNS og netstatus til DVI via STM32 bridge ved opstart
+_push_network_config_to_modbus()
 
 while True:
     now = time.time()
