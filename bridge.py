@@ -286,31 +286,42 @@ def write_fc06(register, value):
     except Exception as e:
         print(f"❌ FC06 write failed: {e}")
 
-def resolve_curve_register(which: str) -> Optional[int]:
+
+    # Store  raw values
+def resolve_curve_register(which: str) -> Optional[dict]:
     """
     which: "-12" or "12"
-    Returns the underlying register for the current central heating config (0x1A).
-    Keeps both raw and translated values in last_writes.
+    Returns {'read': int, 'write': int} for the current central heating config (0x1A).
     """
     raw_val = read_via_fc06(0x1A)
     if raw_val is None:
         print("⚠️ Could not read 0x1A to resolve curve register")
         return None
 
-    # Store  raw values
     last_writes["central_heating_config_raw"] = raw_val
 
     if raw_val == 0:
-        mapping = {"-12": 0x12F, "12": 0x130}
+        # write: 0x12F / 0x130 → read: 0x02F / 0x030
+        write_map = {"12": 0x12F, "-12": 0x130}
+        read_map  = {"12": 0x2F,  "-12": 0x30}
     elif raw_val == 1:
-        mapping = {"-12": 0x131, "12": 0x132}
+        # write: 0x131 / 0x132 → read: 0x031 / 0x032
+        write_map = {"12": 0x131, "-12": 0x132}
+        read_map  = {"12": 0x31,  "-12": 0x32}
     elif raw_val == 2:
-        mapping = {"-12": 0x133, "12": 0x134}
+        # write: 0x133 / 0x134 → read: 0x033 / 0x034
+        write_map = {"12": 0x133, "-12": 0x134}
+        read_map  = {"12": 0x33,  "-12": 0x34}
     else:
         print(f"⚠️ Unknown 0x01A value {raw_val}, cannot resolve curve register")
         return None
 
-    return mapping.get(which)
+    if which not in write_map:
+        print(f"⚠️ Unknown curve selector '{which}'")
+        return None
+
+    return {"read": read_map[which], "write": write_map[which]}
+
 
 # --- MQTT command handling for Modbus writes ---
 command_map = {
@@ -361,6 +372,7 @@ def on_message(client, userdata, msg):
             if reg is None:
                 print(f"❌ Could not resolve register for {topic}")
                 return
+            reg = reg["write"]
             print(f"Writing dynamic curve register 0x{reg:02X} with value {value_raw}")
             write_fc06(reg, value_raw)
             print(f"✅ FC06 write: topic={topic} value={value_raw} reg=0x{reg:02X}")
@@ -424,74 +436,19 @@ mode_options = {
                                "Radiator and mixed systems"]
 }
 
-# --- Samlet discovery-funktion (placeret EFTER fc06_registers/special_fc06/mode_options) ---
+time.sleep(2)  # give HA a chance to subscribe
 
-def publish_all_discovery() -> None:
-    """Publish alle Home Assistant discovery configs (kaldes ved hver MQTT connect)."""
-
-    # Coils -> binary_sensors
-    for idx, label in coil_names.items():
-        publish_discovery_binary(
-            name=label,
-            unique_id=f"dvi_coil_{idx}",
-            coil_key=label
-        )
-
-    # FC04 sensors -> temperature sensors
-    for key, label in fc04_labels.items():
-        publish_discovery_sensor(
-            name=label,
-            unique_id=f"dvi_fc04_{key}",
-            value_template=f"{{{{ value_json.input_registers['{label}'] }}}}",
-            unit="°C",
-            device_class="temperature",
-            state_class="measurement"
-        )
-
-    # Special FC04 cases
-    publish_discovery_sensor(
-        name="em23_power",
-        unique_id="dvi_fc04_power",
-        value_template="{{ value_json.input_registers['em23_power'] | float | round(3) }}",
-        unit="kW",
-        device_class="power",
-        state_class="measurement"
-    )
-    publish_discovery_sensor(
-        name="em23_energy",
-        unique_id="dvi_fc04_energy",
-        value_template="{{ value_json.input_registers['em23_energy'] }}",
-        unit="kWh",
-        device_class="energy",
-        state_class="total_increasing"
-    )
-
-    # Install / service date as diagnostic sensors
-    publish_discovery_sensor(
-        name="Installation Date",
-        unique_id="dvi_static_install_date",
-        value_template="{{ '%s-%s-%s' | format(value_json.install_date.dd, value_json.install_date.mm, value_json.install_date.yy) }}",
-        entity_category="diagnostic"
-    )
-    publish_discovery_sensor(
-        name="Service Date",
-        unique_id="dvi_static_service_date",
-        value_template="{{ '%s-%s-%s' | format(value_json.service_date.dd, value_json.service_date.mm, value_json.service_date.yy) }}",
-        entity_category="diagnostic"
-    )
-
-    # FC06 discovery
-    for reg, label in fc06_registers.items():
-        try:
-            if label in mode_options:
-                cmd_topic = {
-                    "cv_mode": "dvi/command/cvstate",
-                    "cv_night": "dvi/command/cvnight",
-                    "vv_mode": "dvi/command/vvstate",
-                    "vv_schedule": "dvi/command/vvschedule",
-                    "aux_heating": "dvi/command/tvstate",
-                    "central_heating_config": "dvi/command/centralheatingconfig"
-                }[label]
+for reg, label in fc06_registers.items():
+    try:
+        if label in mode_options:
+            cmd_topic = {
+                "cv_mode": "dvi/command/cvstate",
+                "cv_night": "dvi/command/cvnight",
+                "vv_mode": "dvi/command/vvstate",
+                "vv_schedule": "dvi/command/vvschedule",
+                "aux_heating": "dvi/command/tvstate",
+                "central_heating_config": "dvi/command/centralheatingconfig"
+            }[label]
 
                 mapping = {
                     "cv_mode": {0: "Off", 1: "On"},
@@ -602,29 +559,30 @@ def publish_all_discovery() -> None:
         except Exception as e:
             print(f"⚠️ Discovery generation failed for {label}: {e}")
 
-    publish_discovery_number(
-        name="curve_set_-12",
-        unique_id="dvi_fc06_curve_set_-12",
-        command_topic="dvi/command/curveset-12",
-        state_template="{{ value_json.write_registers['curve_set_-12'] }}",
-        min_val=10,
-        max_val=80,
-        step=1,
-        entity_category="config"
-    )
-    print("🟢 Published number discovery: curve_set_-12 -> dvi/command/curveset-12")
+# Explicit discovery for dynamic curve-set numbers
+publish_discovery_number(
+    name="curve_set_-12",
+    unique_id="dvi_fc06_curve_set_-12",
+    command_topic="dvi/command/curveset-12",
+    state_template="{{ value_json.write_registers['curve_set_-12_read'] }}",
+    min_val=10,
+    max_val=80,
+    step=1,
+    entity_category="config"
+)
+print("🟢 Published number discovery: curve_set_-12 -> dvi/command/curveset-12")
 
-    publish_discovery_number(
-        name="curve_set_12",
-        unique_id="dvi_fc06_curve_set_12",
-        command_topic="dvi/command/curveset12",
-        state_template="{{ value_json.write_registers['curve_set_12'] }}",
-        min_val=10,
-        max_val=80,
-        step=1,
-        entity_category="config"
-    )
-    print("🟢 Published number discovery: curve_set_12 -> dvi/command/curveset12")
+publish_discovery_number(
+    name="curve_set_12",
+    unique_id="dvi_fc06_curve_set_12",
+    command_topic="dvi/command/curveset12",
+    state_template="{{ value_json.write_registers['curve_set_12_read'] }}",
+    min_val=10,
+    max_val=80,
+    step=1,
+    entity_category="config"
+)
+print("🟢 Published number discovery: curve_set_12 -> dvi/command/curveset12")
 
 
 # --- MQTT callbacks (EFTER publish_all_discovery er defineret) --------------
@@ -833,19 +791,30 @@ while True:
         config_val = last_writes.get("central_heating_config")
         if isinstance(config_val, int):
             if config_val == 0:
-                curve_regs = {0x12F: "curve_set_-12", 0x130: "curve_set_12"}
+                curve_regs = {"12_write": 0x12F, "-12_write": 0x130}
             elif config_val == 1:
-                curve_regs = {0x131: "curve_set_-12", 0x132: "curve_set_12"}
+                curve_regs = {"12_write": 0x131, "-12_write": 0x132}
             elif config_val == 2:
-                curve_regs = {0x133: "curve_set_-12", 0x134: "curve_set_12"}
+                curve_regs = {"12_write": 0x133, "-12_write": 0x134}
             else:
                 curve_regs = {}
 
-            for reg, label in curve_regs.items():
+            # derive read registers (subtract 0x100 for config 0/1, explicit for config 2)
+            if config_val == 0:
+                curve_regs["12_read"]  = 0x2F
+                curve_regs["-12_read"] = 0x30
+            elif config_val == 1:
+                curve_regs["12_read"]  = 0x31
+                curve_regs["-12_read"] = 0x32   
+            elif config_val == 2:
+                curve_regs["12_read"]  = 0x33
+                curve_regs["-12_read"] = 0x34
+
+            # actually read values from the read registers
+            for key, reg in curve_regs.items():
                 val = read_via_fc06(reg)
                 if val is not None:
-                    last_writes[label] = val
-
+                    last_writes[f"curve_set_{key}"] = val
         last_misc_update = now
 
     # Final payload from cached values
