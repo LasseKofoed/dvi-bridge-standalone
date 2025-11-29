@@ -454,7 +454,7 @@ for reg, label in fc06_registers.items():
                 "central_heating_config": "dvi/command/centralheatingconfig"
             }[label]
 
-                mapping = {
+            mapping = {
                     "cv_mode": {0: "Off", 1: "On"},
                     "cv_night": {0: "Timer", 1: "Constant day", 2: "Constant night"},
                     "vv_mode": {0: "Off", 1: "On"},
@@ -467,32 +467,32 @@ for reg, label in fc06_registers.items():
                     }
                 }[label]
 
-                if label == "central_heating_config":
-                    publish_discovery_select(
-                        name=label,
-                        unique_id=f"dvi_fc06_{label}",
-                        command_topic=cmd_topic,
-                        state_template=f"""
-                          {{% set map = {mapping} %}}
-                          {{{{ map[value_json.write_registers['{label}']] }}}}
-                        """,
-                        options=mode_options[label],
-                        entity_category="config"
-                    )
-                else:
-                    publish_discovery_select(
-                        name=label,
-                        unique_id=f"dvi_fc06_{label}",
-                        command_topic=cmd_topic,
-                        state_template=f"""
-                          {{% set map = {mapping} %}}
-                          {{{{ map[value_json.write_registers['{label}']] }}}}
-                        """,
-                        options=mode_options[label]
-                   )
-                print(f"🟢 Published select discovery: {label} -> {cmd_topic}")
+            if label == "central_heating_config":
+                publish_discovery_select(
+                    name=label,
+                    unique_id=f"dvi_fc06_{label}",
+                    command_topic=cmd_topic,
+                    state_template=f"""
+                    {{% set map = {mapping} %}}
+                    {{{{ map[value_json.write_registers['{label}']] }}}}
+                    """,
+                    options=mode_options[label],
+                    entity_category="config"
+                )
+            else:
+                publish_discovery_select(
+                    name=label,
+                    unique_id=f"dvi_fc06_{label}",
+                    command_topic=cmd_topic,
+                    state_template=f"""
+                        {{% set map = {mapping} %}}
+                        {{{{ map[value_json.write_registers['{label}']] }}}}
+                    """,
+                    options=mode_options[label]
+                )
+            print(f"🟢 Published select discovery: {label} -> {cmd_topic}")
 
-            elif label == "cv_curve":
+        elif label == "cv_curve":
                 publish_discovery_number(
                     name=label,
                     unique_id=f"dvi_fc06_{label}",
@@ -504,7 +504,7 @@ for reg, label in fc06_registers.items():
                 )
                 print(f"🟢 Published number discovery: {label} -> dvi/command/cvcurve")
 
-            elif label == "vv_setpoint":
+        elif label == "vv_setpoint":
                 publish_discovery_number(
                     name=label,
                     unique_id=f"dvi_fc06_{label}",
@@ -557,40 +557,40 @@ for reg, label in fc06_registers.items():
             )
             print(f"🟢 Published sensor discovery: {label}")
 
-            elif label == "cv_setpoint":
-                publish_discovery_sensor(
-                    name=label,
-                    unique_id=f"dvi_fc06_{label}",
-                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                    unit="°C",
-                    device_class="temperature",
-                    state_class="measurement"
-                )
-                print(f"🟢 Published sensor discovery: {label}")
+        elif label == "cv_setpoint":
+            publish_discovery_sensor(
+                name=label,
+                unique_id=f"dvi_fc06_{label}",
+                value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                unit="°C",
+                device_class="temperature",
+                state_class="measurement"
+            )
+            print(f"🟢 Published sensor discovery: {label}")
 
-            elif label in special_fc06:
-                cfg = special_fc06[label]
-                publish_discovery_sensor(
-                    name=label,
-                    unique_id=f"dvi_fc06_{label}",
-                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                    unit=cfg.get("unit"),
-                    device_class=cfg.get("device_class"),
-                    state_class=cfg.get("state_class")
-                )
-                print(f"🟢 Published sensor discovery: {label}")
+        elif label in special_fc06:
+            cfg = special_fc06[label]
+            publish_discovery_sensor(
+                name=label,
+                unique_id=f"dvi_fc06_{label}",
+                value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                unit=cfg.get("unit"),
+                device_class=cfg.get("device_class"),
+                state_class=cfg.get("state_class")
+            )
+            print(f"🟢 Published sensor discovery: {label}")
 
-            else:
-                publish_discovery_sensor(
-                    name=label,
-                    unique_id=f"dvi_fc06_{label}",
-                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
-                    state_class="measurement"
-                )
-                print(f"🟢 Published sensor discovery: {label}")
+        else:
+            publish_discovery_sensor(
+                name=label,
+                unique_id=f"dvi_fc06_{label}",
+                value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                state_class="measurement"
+            )
+            print(f"🟢 Published sensor discovery: {label}")
 
-        except Exception as e:
-            print(f"⚠️ Discovery generation failed for {label}: {e}")
+    except Exception as e:
+        print(f"⚠️ Discovery generation failed for {label}: {e}")
 
 # Explicit discovery for dynamic curve-set numbers
 publish_discovery_number(
