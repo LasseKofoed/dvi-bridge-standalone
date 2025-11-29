@@ -1,3 +1,9 @@
 minimalmodbus
 paho-mqtt
 python-dotenv
+<<<<<<< Updated upstream
+=======
+modbus-tk
+pyserial
+requests
+>>>>>>> Stashed changes
