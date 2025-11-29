@@ -272,6 +272,8 @@ command_map = {
     "dvi/command/vvschedule": {"register": 0x10C, "scale": 1},
     "dvi/command/tvstate": {"register": 0x10F, "scale": 1},
     "dvi/command/centralheatingconfig": {"register": 0x11A, "scale": 1},
+    "dvi/command/cvmax": {"register": 0x11B, "scale": 1},
+    "dvi/command/cvmin": {"register": 0x11C, "scale": 1},
     "dvi/command/curveset-12": {"dynamic_curve": "-12", "scale": 1},
     "dvi/command/curveset12": {"dynamic_curve": "12", "scale": 1},
 }
@@ -398,7 +400,9 @@ fc06_registers = {
     0xA2: "vv_hours",
     0xA3: "heating_hours",
     0xD0: "curve_temp",
-    0x1A: "central_heating_config"
+    0x1A: "central_heating_config",
+    0x1B: "cv_max",
+    0x1C: "cv_min"
 }
 
 # Special FC06 sensor definitions
@@ -511,6 +515,34 @@ for reg, label in fc06_registers.items():
                 unit="°C"
             )
             print(f"🟢 Published number discovery: {label} -> dvi/command/vvsetpoint")
+
+        elif label == "cv_max":
+            publish_discovery_number(
+                name=label,
+                unique_id=f"dvi_fc06_{label}",
+                command_topic="dvi/command/cvmax",
+                state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                min_val=20,
+                max_val=55,
+                step=1,
+                unit="°C",
+                entity_category="config"
+            )
+            print(f"🟢 Published number discovery: {label} -> dvi/command/cvmax")
+
+        elif label == "cv_min":
+            publish_discovery_number(
+                name=label,
+                unique_id=f"dvi_fc06_{label}",
+                command_topic="dvi/command/cvmin",
+                state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                min_val=10,
+                max_val=45,
+                step=1,
+                unit="°C",
+                entity_category="config"
+            )
+            print(f"🟢 Published number discovery: {label} -> dvi/command/cvmin")
 
         # Read-only FC06 sensors
         elif label == "curve_temp":
@@ -642,7 +674,9 @@ while True:
             0xA2: "vv_hours",
             0xA3: "heating_hours",
             0xD0: "curve_temp",
-            0x1A: "central_heating_config"
+            0x1A: "central_heating_config",
+            0x1B: "cv_max",
+            0x1C: "cv_min"
         }
 
         # Define adjustments: reg -> (multiplier, decimals)
