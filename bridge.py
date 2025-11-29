@@ -602,6 +602,7 @@ publish_discovery_number(
     min_val=10,
     max_val=80,
     step=1,
+    unit="°C",
     entity_category="config"
 )
 print("🟢 Published number discovery: curve_set_-12 -> dvi/command/curveset-12")
@@ -614,6 +615,7 @@ publish_discovery_number(
     min_val=10,
     max_val=80,
     step=1,
+    unit="°C",
     entity_category="config"
 )
 print("🟢 Published number discovery: curve_set_12 -> dvi/command/curveset12")
