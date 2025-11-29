@@ -26,27 +26,18 @@ else:
 load_dotenv()  # this will read .env in the current directory
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# Pump ID / FABNR + SW-versioner from environment (written by read_static_values_modbustk.py)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_VALUES_SCRIPT = os.path.join(SCRIPT_DIR, "read_static_values_modbustk.py")
 
-def _ensure_pump_id() -> Optional[str]:
-    """
-    Hvis FABNR ikke er sat i .env, prøv at køre read_static_values_modbustk.py én gang
-    for at hente den via modbus_tk. Reload derefter .env og returner FABNR.
-    """
-    pid = os.getenv("FABNR") or None
-    if pid:
-        return pid
-
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "read_static_values_modbustk.py")
-    if not os.path.isfile(script_path):
-        print("⚠️ FABNR not set and read_static_values_modbustk.py not found; skipping FABNR auto-detect.")
-        return None
-
-    print("ℹ️ No FABNR in .env, attempting to read via read_static_values_modbustk.py ...")
+def _refresh_static_values() -> None:
+    if not os.path.isfile(STATIC_VALUES_SCRIPT):
+        print("⚠️ read_static_values_modbustk.py not found; skipping static refresh.")
+        return
+    print("ℹ️ Refreshing static values via read_static_values_modbustk.py ...")
     try:
         result = subprocess.run(
-            [sys.executable, script_path],
-            cwd=os.path.dirname(script_path),
+            [sys.executable, STATIC_VALUES_SCRIPT],
+            cwd=os.path.dirname(STATIC_VALUES_SCRIPT),
             timeout=60,
             capture_output=True,
             text=True,
@@ -56,12 +47,13 @@ def _ensure_pump_id() -> Optional[str]:
             print(f"⚠️ read_static_values_modbustk.py exited with code {result.returncode}")
             if result.stderr:
                 print(result.stderr, end="")
-        else:
-            # Scriptet opdaterer .env; reload og læs FABNR/SW/SERVICE igen
-            load_dotenv(override=True)
+            return
+        load_dotenv(override=True)
     except Exception as e:
         print(f"⚠️ Failed to run read_static_values_modbustk.py: {e}")
 
+def _ensure_pump_id() -> Optional[str]:
+    _refresh_static_values()
     return os.getenv("FABNR") or None
 
 PUMP_ID: Optional[str] = _ensure_pump_id()

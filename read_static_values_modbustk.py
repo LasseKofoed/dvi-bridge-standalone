@@ -145,7 +145,7 @@ def convert_sw_to_float(sw_seq):
     return float(s), s  # både float og strengrepræsentation
 
 
-def _update_env_key(key: str, value: str):
+def _update_env_key(key: str, value: str, *, force: bool = False):
     env_lines = []
     if os.path.isfile(ENV_PATH):
         try:
@@ -153,24 +153,33 @@ def _update_env_key(key: str, value: str):
                 env_lines = f.readlines()
         except Exception:
             env_lines = []
+
+    key_prefix = f"{key}="
+    found_idx = None
+    for idx, line in enumerate(env_lines):
+        if line.startswith(key_prefix):
+            found_idx = idx
+            break
+
+    if found_idx is not None and not force:
+        return False
+
     new_line = f"{key}={value}\n"
-    written = False
-    out_lines = []
-    for line in env_lines:
-        if line.strip().startswith(f"{key}="):
-            if not written:
-                out_lines.append(new_line)
-                written = True
-        else:
-            out_lines.append(line)
-    if not written:
-        out_lines.append(new_line)
+    if found_idx is not None and env_lines[found_idx] == new_line:
+        return False
+    if found_idx is None:
+        env_lines.append(new_line)
+    else:
+        env_lines[found_idx] = new_line
+
     try:
         with open(ENV_PATH, "w", encoding="utf-8") as f:
-            f.writelines(out_lines)
+            f.writelines(env_lines)
         print(f"💾 Updated {ENV_PATH} with {key}={value}")
+        return True
     except Exception as e:
         print(f"⚠️ Could not write {ENV_PATH}: {e}")
+        return False
 
 
 def read_date_raw(master, addr):
@@ -250,9 +259,9 @@ def persist_static_values(
 
     # SWBOT/SWTOP opdateres altid i .env (de kan ændres ved firmwareopdatering)
     if swbot_str is not None:
-        _update_env_key("SWBOT", swbot_str)
+        _update_env_key("SWBOT", swbot_str, force=True)
     if swtop_str is not None:
-        _update_env_key("SWTOP", swtop_str)
+        _update_env_key("SWTOP", swtop_str, force=True)
 
     # Installationsdato: INSTALL_DD / INSTALL_MM / INSTALL_YY
     if install_date is not None:
@@ -262,9 +271,9 @@ def persist_static_values(
 
     # Service-dato: SERVICE_DD / SERVICE_MM / SERVICE_YY
     if service_date is not None:
-        _update_env_key("SERVICE_DD", str(service_date["DD"]))
-        _update_env_key("SERVICE_MM", str(service_date["MM"]))
-        _update_env_key("SERVICE_YY", str(service_date["YY"]))
+        _update_env_key("SERVICE_DD", str(service_date["DD"]), force=True)
+        _update_env_key("SERVICE_MM", str(service_date["MM"]), force=True)
+        _update_env_key("SERVICE_YY", str(service_date["YY"]), force=True)
 
 
 def main():
