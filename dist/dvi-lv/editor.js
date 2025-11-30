@@ -59,6 +59,8 @@ export class LvHeatpumpCardEditor extends HTMLElement {
 			{ name: "cv_return_temp", label: "CV return temperature (cv_return_temp)", selector: { entity: { domain: "sensor" } } },
 			{ name: "em23_power", label: "EM23 power (em23_power)", selector: { entity: { domain: "sensor" } } },
 			{ name: "em23_energy", label: "EM23 energy (em23_energy)", selector: { entity: { domain: "sensor" } } },
+			{ name: "install_date", label: "Installation date sensor", selector: { entity: { domain: "sensor" } } },
+            { name: "service_date", label: "Service date sensor", selector: { entity: { domain: "sensor" } } },
 			{ name: "comp_icon", label: "Compressor state (comp_icon)", selector: { entity: { domain: "binary_sensor" } } },
 			{ name: "cv_pump_icon", label: "CV pump state (cv_pump_icon)", selector: { entity: { domain: "binary_sensor" } } },
 			{ name: "defrost_icon", label: "Defrost state (defrost_icon)", selector: { entity: { domain: "binary_sensor" } } },
@@ -167,22 +169,32 @@ export class LvHeatpumpCardEditor extends HTMLElement {
 			cv_return_temp: find("sensor", "cv_return"),
 			em23_power: find("sensor", "em23_power"),
 			em23_energy: find("sensor", "em23_energy"),
+			install_date: find("sensor", "install_date"),
+            service_date: find("sensor", "service_date"),
+			comp_hours: find("sensor", "comp_hours"),
+			vv_hours: find("sensor", "vv_hours"),
+			heating_hours: find("sensor", "heating_hours"),
 			comp_icon: find("binary_sensor", "soft_starter_compressor"),
 			cv_pump_icon: find("binary_sensor", "circ_pump_cv"),
 			defrost_icon: find("binary_sensor", "4_way_valve_defrost"),
+			
 		};
 
 		const info_entities = [
 			patch.em23_energy,
 			patch.em23_power,
-			entityIds.find((e) => e.endsWith("_comp_hours")),
-			entityIds.find((e) => e.endsWith("_vv_hours")),
-			entityIds.find((e) => e.endsWith("_heating_hours")),
+			patch.install_date,
+            patch.service_date,
+			patch.comp_hours,
+			patch.vv_hours,
+			patch.heating_hours,		
+
+
 		].filter(Boolean);
 
 		const cv_entities = [
 			patch.cv_mode,
-			find("number", "cv_curve"),
+			patch.cv_curve_number,			
 			patch.aux_heating,
 			patch.cv_night,
 		].filter(Boolean);
@@ -191,7 +203,7 @@ export class LvHeatpumpCardEditor extends HTMLElement {
 
 		const aux_entities = [
 			patch.aux_heating,
-			entityIds.find((e) => e.startsWith("sensor.") && e.endsWith("_heating_hours")),
+			patch.heating_hours,
 		].filter(Boolean);
 
 		this._config = {
