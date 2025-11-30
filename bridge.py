@@ -258,12 +258,14 @@ def read_input(register, signed=False):
         print(f"FC04 read failed for 0x{register:02X}: {e}")
         return None
 
-def read_via_fc06(register):
+def read_via_fc06(register, signed=False):
     try:
         with modbus_lock:
             payload = struct.pack('>HH', register, 0x0000)
             response = instrument._perform_command(6, payload)
             _, value = struct.unpack('>HH', response)
+            if signed:
+                value = struct.unpack('>h', struct.pack('>H', value))[0]
             return value
     except Exception as e:
         print(f"FC06 echo failed for 0x{register:02X}: {e}")
@@ -277,16 +279,6 @@ def write_fc06(register, value):
         print(f"✅ FC06 write sent: reg={register}, value={value}")
     except Exception as e:
         print(f"❌ FC06 write failed: {e}")
-
-def resolve_curve_register(which: str) -> Optional[dict]:
-    """
-    which: "-12" eller "12"
-    Returns {'read': int, 'write': int} for the current central heating config (0x1A).
-    """
-    raw_val = read_via_fc06(0x1A)
-    if raw_val is None:
-        print("⚠️ Could not read 0x1A to resolve curve register")
-        return None
 
     # Store  raw values
 def resolve_curve_register(which: str) -> Optional[dict]:
@@ -336,6 +328,7 @@ command_map = {
     "dvi/command/centralheatingconfig": {"register": 0x11A, "scale": 1},
     "dvi/command/cvmax": {"register": 0x11B, "scale": 1},
     "dvi/command/cvmin": {"register": 0x11C, "scale": 1},
+#    "dvi/command/outdoorcal": {"register": 0x18D, "scale": 1}, 
     "dvi/command/curveset-12": {"dynamic_curve": "-12", "scale": 1},
     "dvi/command/curveset12": {"dynamic_curve": "12", "scale": 1},
 }
@@ -406,7 +399,8 @@ fc06_registers = {
     0xD0: "curve_temp",
     0x1A: "central_heating_config",
     0x1B: "cv_max",
-    0x1C: "cv_min"
+    0x1C: "cv_min",
+    0x8D: "outdoor_cal"
 }
 
 # Special FC06 sensor definitions
@@ -599,6 +593,31 @@ def publish_all_discovery() -> None:
                     entity_category="config"
                 )
                 print(f"🟢 Published number discovery: {label} -> dvi/command/cvmin")
+
+#            elif label == "outdoor_cal":
+#                publish_discovery_number(
+#                    name=label,
+#                    unique_id=f"dvi_fc06_{label}",
+#                    command_topic="dvi/command/outdoorcal",
+#                    state_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+#                    min_val=-5,
+#                    max_val=5,
+#                    step=1,
+#                    unit="°C",
+#                    entity_category="config"
+#                )
+#                print(f"🟢 Published number discovery: {label} -> dvi/command/outdoorcal")#
+
+            elif label == "outdoor_cal":
+                publish_discovery_sensor(
+                    name=label,
+                    unique_id=f"dvi_fc06_{label}",
+                    value_template=f"{{{{ value_json.write_registers['{label}'] }}}}",
+                    unit="°C",
+                    device_class="temperature",
+                    state_class="measurement"
+                )
+                print(f"🟢 Published sensor discovery: {label}")
 
             elif label == "curve_temp":
                 publish_discovery_sensor(
@@ -859,17 +878,22 @@ while True:
             0xD0: "curve_temp",
             0x1A: "central_heating_config",
             0x1B: "cv_max",
-            0x1C: "cv_min"
+            0x1C: "cv_min",
+            0x8D: "outdoor_cal"
         }
 
         # Define adjustments: reg -> (multiplier, decimals)
         fc06_adjustments = {
             0xD0: (0.1, 1),   # curve_temp
+            0x8D: (0.1, 1)    # outdoor_cal
         }
 
+        # Define which FC06 registers are signed
+        signed_fc06 = {0x8D}  # outdoor_cal
+        
         # Read base FC06 set
         for reg, label in fc06_regs_60s.items():
-            val = read_via_fc06(reg)
+            val = read_via_fc06(reg, signed=(reg in signed_fc06))
             if val is not None:
                 if reg in fc06_adjustments:
                     mult, decimals = fc06_adjustments[reg]
