@@ -236,6 +236,10 @@ ha-card {
 	align-self: flex-start;
 	padding: 6px 12px;
 	cursor: pointer;
+}
+
+@media (max-width: 500px) {
+	.chip-label {
 		display: none;
 	}
 
