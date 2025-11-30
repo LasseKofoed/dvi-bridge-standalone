@@ -51,7 +51,7 @@ export function buildDiagramView({ hass, config, imageBase }) {
 	};
 
 	const valueWithUnit = (key, value) =>
-		value === null ? "" : `${value}${unitForKey(key)}`;
+		value === null ? "" : `${value}<span class="diagram-unit">${unitForKey(key)}</span>`;
 
 	const cvMode = getState(config.cv_mode) ?? "unavailable";
 	const vvMode = getState(config.vv_mode) ?? "unavailable";
