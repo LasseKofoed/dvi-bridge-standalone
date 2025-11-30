@@ -1,0 +1,284 @@
+const CV_NIGHT_ICONS = {
+	Timer: "mdi:clock-outline",
+	"Constant day": "mdi:weather-sunny",
+	"Constant night": "mdi:weather-night",
+};
+
+const VV_SCHEDULE_ICONS = {
+	Timer: "mdi:clock-outline",
+	"Constant on": "mdi:toggle-switch",
+	"Constant off": "mdi:toggle-switch-off-outline",
+};
+
+const CHIP_TITLES = {
+	info: "Information",
+	cv: "Centralvarme",
+	vv: "Varmtvandstemperatur",
+	aux: "El-patron / AUX",
+};
+
+const opacityFor = (state) => (state === "on" ? 1 : 0.25);
+
+export function buildDiagramView({ hass, config, imageBase }) {
+	const getState = (entityId) =>
+		entityId && hass.states[entityId] ? hass.states[entityId].state : null;
+
+	const getUnit = (entityId) =>
+		entityId && hass.states[entityId]
+			? hass.states[entityId].attributes.unit_of_measurement || ""
+			: "";
+
+	const showUnit = config.show_temp_unit ?? false;
+
+	const stateEntityMap = {
+		outdoor: config.outdoor_temp,
+		curve: config.curve_temp,
+		tankCv: config.storage_tank_cv,
+		tankVv: config.storage_tank_vv,
+		evap: config.evaporator_temp,
+		hp: config.hp_temp,
+		lp: config.lp_temp,
+		cvForward: config.cv_forward_temp,
+		cvReturn: config.cv_return_temp,
+	};
+
+	const unitForKey = (key) => {
+		if (!showUnit) return "";
+		const eid = stateEntityMap[key];
+		if (!eid) return "";
+		const unit = getUnit(eid);
+		return unit ? ` ${unit}` : "";
+	};
+
+	const valueWithUnit = (key, value) =>
+		value === null ? "" : `${value}${unitForKey(key)}`;
+
+	const cvMode = getState(config.cv_mode) ?? "unavailable";
+	const vvMode = getState(config.vv_mode) ?? "unavailable";
+	const cvNight = config.cv_night ? getState(config.cv_night) : null;
+	const vvSchedule = config.vv_schedule ? getState(config.vv_schedule) : null;
+	const auxHeating = config.aux_heating ? getState(config.aux_heating) : null;
+
+	const outdoor = config.outdoor_temp ? getState(config.outdoor_temp) : null;
+	const curveTemp = config.curve_temp ? getState(config.curve_temp) : null;
+	const tankCv = config.storage_tank_cv ? getState(config.storage_tank_cv) : null;
+	const tankVv = config.storage_tank_vv ? getState(config.storage_tank_vv) : null;
+	const power = config.em23_power ? getState(config.em23_power) : null;
+
+	const evapTemp = config.evaporator_temp ? getState(config.evaporator_temp) : null;
+	const hpTemp = config.hp_temp ? getState(config.hp_temp) : null;
+	const lpTemp = config.lp_temp ? getState(config.lp_temp) : null;
+	const cvForwardTemp = config.cv_forward_temp ? getState(config.cv_forward_temp) : null;
+	const cvReturnTemp = config.cv_return_temp ? getState(config.cv_return_temp) : null;
+
+	const compState = config.comp_icon ? getState(config.comp_icon) : null;
+	const cvPumpState = config.cv_pump_icon ? getState(config.cv_pump_icon) : null;
+	const defrostState = config.defrost_icon ? getState(config.defrost_icon) : null;
+
+	const cvIconColor =
+		cvMode === "Off" || cvMode === "unavailable"
+			? "var(--disabled-text-color)"
+			: "var(--state-climate-heat-color, var(--accent-color))";
+
+	const vvIconColor =
+		vvMode === "Off" || vvMode === "unavailable"
+			? "var(--disabled-text-color)"
+			: "var(--state-water-heater-heat-color, var(--accent-color))";
+
+	const auxIconColor =
+		auxHeating && auxHeating !== "Off"
+			? "var(--warning-color, #fdd835)"
+			: "var(--disabled-text-color)";
+
+	const vvScheduleColor =
+		vvSchedule && vvSchedule !== "Constant off"
+			? "var(--secondary-text-color)"
+			: "var(--disabled-text-color)";
+
+	const infoEntities = Array.isArray(config.info_entities) ? config.info_entities : [];
+	const cvEntities = Array.isArray(config.cv_entities) ? config.cv_entities : [];
+	const vvEntities = Array.isArray(config.vv_entities) ? config.vv_entities : [];
+	const auxEntities = Array.isArray(config.aux_entities) ? config.aux_entities : [];
+
+	const iconEntityMap = {
+		defrost: config.defrost_icon,
+		comp: config.comp_icon,
+		cvPump: config.cv_pump_icon,
+		aux: config.aux_heating,
+	};
+
+	const cvNightIcon = cvNight ? CV_NIGHT_ICONS[cvNight] ?? null : null;
+	const vvScheduleIcon = vvSchedule ? VV_SCHEDULE_ICONS[vvSchedule] ?? null : null;
+
+	const html = `
+    <img src="${imageBase}/dvi.gif" class="diagram-base" alt="LV diagram" />
+
+    ${
+			outdoor !== null
+				? `<div class="diagram-label label-outdoor" data-key="outdoor">${valueWithUnit(
+						"outdoor",
+						outdoor,
+				  )}</div>`
+				: ""
+		}
+
+    <div class="diagram-label heat-curve-trigger" data-heat-curve-trigger="true">Kurvetemperatur</div>
+
+    ${
+			curveTemp !== null
+				? `<div class="diagram-label label-curve" data-key="curve">${valueWithUnit(
+						"curve",
+						curveTemp,
+				  )}</div>`
+				: ""
+		}
+
+    ${
+			evapTemp !== null
+				? `<div class="diagram-label label-evaporator" data-key="evap">${valueWithUnit(
+						"evap",
+						evapTemp,
+				  )}</div>`
+				: ""
+		}
+
+    ${
+			hpTemp !== null
+				? `<div class="diagram-label label-hp" data-key="hp">${valueWithUnit("hp", hpTemp)}</div>`
+				: ""
+		}
+
+    ${
+			lpTemp !== null
+				? `<div class="diagram-label label-lp" data-key="lp">${valueWithUnit("lp", lpTemp)}</div>`
+				: ""
+		}
+
+    ${
+			tankCv !== null
+				? `<div class="diagram-label label-tank-cv" data-key="tankCv">${valueWithUnit("tankCv", tankCv)}</div>`
+				: ""
+		}
+
+    ${
+			tankVv !== null
+				? `<div class="diagram-label label-tank-vv" data-key="tankVv">${valueWithUnit("tankVv", tankVv)}</div>`
+				: ""
+		}
+
+    ${
+			cvForwardTemp !== null
+				? `<div class="diagram-label label-cv-forward" data-key="cvForward">${valueWithUnit(
+						"cvForward",
+						cvForwardTemp,
+				  )}</div>`
+				: ""
+		}
+
+    ${
+			cvReturnTemp !== null
+				? `<div class="diagram-label label-cv-return" data-key="cvReturn">${valueWithUnit(
+						"cvReturn",
+						cvReturnTemp,
+				  )}</div>`
+				: ""
+		}
+
+    <div class="diagram-icon icon-cv-pump" data-icon-key="cvPump" style="opacity:${opacityFor(cvPumpState)};">
+      <img src="${imageBase}CV_on.gif" alt="CV pump" />
+    </div>
+    <div class="diagram-icon icon-cv-flow" data-icon-key="cvPump" style="opacity:${opacityFor(cvPumpState)};">
+      <img src="${imageBase}CVflow_on.gif" alt="CV flow" />
+    </div>
+
+    <div class="diagram-icon icon-hp-loop" data-icon-key="comp" style="opacity:${compState === "on" ? 1 : 0};">
+      <img src="${imageBase}HP_on.gif" alt="HP on" />
+    </div>
+    <div class="diagram-icon icon-comp-unit" data-icon-key="comp" style="opacity:${compState === "on" ? 1 : 0};">
+      <img src="${imageBase}COMP_on.gif" alt="Compressor on" />
+    </div>
+
+    ${
+			defrostState !== null
+				? `<ha-icon
+             class="diagram-element icon-defrost"
+             data-icon-key="defrost"
+             style="color:${defrostState === "on" ? "orange" : "var(--disabled-text-color)"};"
+             icon="mdi:snowflake-melt">
+           </ha-icon>`
+				: ""
+		}
+
+    ${
+			auxHeating && auxHeating !== "Off"
+				? `<ha-icon
+             class="diagram-element icon-aux"
+             data-icon-key="aux"
+             style="color:var(--warning-color, #fdd835);"
+             icon="mdi:lightning-bolt-outline">
+           </ha-icon>`
+				: ""
+		}
+
+    <div class="mode-bar">
+      ${
+				infoEntities.length
+					? `<div class="mode-chip popup-chip" data-popup="info">
+               <ha-icon icon="mdi:information-slab-circle"></ha-icon>
+               <span class="chip-label">Info</span>
+               ${power !== null ? `<span class="chip-value">${power} kW</span>` : ""}
+             </div>`
+					: ""
+			}
+
+      ${
+				cvEntities.length
+					? `<div class="mode-chip popup-chip" data-popup="cv">
+               <ha-icon icon="mdi:radiator" style="color:${cvIconColor};"></ha-icon>
+               ${
+									cvNightIcon
+										? `<ha-icon class="small-mode-icon" icon="${cvNightIcon}" style="color:${cvIconColor};"></ha-icon>`
+										: ""
+								}
+               <span class="chip-label">CV</span>
+             </div>`
+					: ""
+			}
+
+      ${
+				vvEntities.length
+					? `<div class="mode-chip popup-chip" data-popup="vv">
+               <ha-icon icon="mdi:shower-head" style="color:${vvIconColor};"></ha-icon>
+               ${
+									vvScheduleIcon
+										? `<ha-icon class="small-mode-icon" icon="${vvScheduleIcon}" style="color:${vvScheduleColor};"></ha-icon>`
+										: ""
+								}
+               <span class="chip-label">VV</span>
+             </div>`
+					: ""
+			}
+
+      ${
+				auxEntities.length
+					? `<div class="mode-chip popup-chip" data-popup="aux">
+               <ha-icon icon="mdi:lightning-bolt-outline" style="color:${auxIconColor};"></ha-icon>
+               <span class="chip-label">AUX</span>
+             </div>`
+					: ""
+			}
+    </div>
+  `;
+
+	return {
+		html,
+		stateEntityMap,
+		iconEntityMap,
+		chipGroups: {
+			info: { title: CHIP_TITLES.info, entities: infoEntities },
+			cv: { title: CHIP_TITLES.cv, entities: cvEntities },
+			vv: { title: CHIP_TITLES.vv, entities: vvEntities },
+			aux: { title: CHIP_TITLES.aux, entities: auxEntities },
+		},
+	};
+}

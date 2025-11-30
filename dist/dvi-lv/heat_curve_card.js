@@ -77,12 +77,11 @@ class HeatCurveCard extends HTMLElement {
 		}
 	}
 
-	_renderSkeleton() {
-		const styleTag = `<style>@import url("${CARD_STYLE_URL}");</style>`;
+	_renderSkeleton() {		
 		const existingCard = this.querySelector("ha-card");
 		if (!existingCard) {
 			this.innerHTML = `
-        ${styleTag}
+        
         <ha-card class="heat-curve-card" header="${this._title}">
           <div class="heat-curve-card__chart" data-role="chart">
             <canvas data-role="curveChart"></canvas>
