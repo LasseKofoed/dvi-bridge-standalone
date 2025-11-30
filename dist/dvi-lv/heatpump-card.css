@@ -208,3 +208,32 @@ ha-card {
 	flex: 1;
 	width: 100%;
 }
+
+/* ============ Editor Container ============ */
+.card-config {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.advanced-config {
+	margin-top: 16px;
+}
+
+.advanced-config__summary {
+	cursor: pointer;
+}
+
+.advanced-config__body {
+	margin-top: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.advanced-config__btn {
+	margin-top: 8px;
+	align-self: flex-start;
+	padding: 6px 12px;
+	cursor: pointer;
+}

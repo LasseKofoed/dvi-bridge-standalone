@@ -92,15 +92,16 @@ export class LvHeatpumpCardEditor extends HTMLElement {
 		this._formBasic = basicForm;
 
 		const details = document.createElement("details");
-		details.style.marginTop = "16px";
+		details.className = "advanced-config";
 
 		const summary = document.createElement("summary");
+		summary.className = "advanced-config__summary";
 		summary.textContent = "Advanced entity mapping";
 		summary.style.cursor = "pointer";
 		details.appendChild(summary);
 
 		const advWrapper = document.createElement("div");
-		advWrapper.style.marginTop = "8px";
+		advWrapper.className = "advanced-config__body";
 
 		const advForm = document.createElement("ha-form");
 		advForm.schema = this._advancedSchema;
@@ -116,8 +117,8 @@ export class LvHeatpumpCardEditor extends HTMLElement {
 
 		const resetBtn = document.createElement("button");
 		resetBtn.type = "button";
+		resetBtn.className = "advanced-config__btn";
 		resetBtn.textContent = "Auto-fill from device";
-		resetBtn.style.marginTop = "8px";
 		resetBtn.addEventListener("click", () => {
 			if (!this._config.device_id) return;
 			this._autoFillFromDevice(this._config.device_id);
