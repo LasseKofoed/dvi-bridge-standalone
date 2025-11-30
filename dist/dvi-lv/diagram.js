@@ -53,6 +53,13 @@ export function buildDiagramView({ hass, config, imageBase }) {
 	const valueWithUnit = (key, value) =>
 		value === null ? "" : `${value}<span class="diagram-unit">${unitForKey(key)}</span>`;
 
+	const normalizeState = (state) => (typeof state === "string" ? state.toLowerCase() : state);
+	const isModeActive = (state) => {
+		const normalized = normalizeState(state);
+		return normalized !== null && normalized !== undefined && normalized !== "off" && normalized !== "unavailable";
+	};
+	const chipStateClass = (active) => (active ? "mode-chip--active" : "mode-chip--inactive");
+
 	const cvMode = getState(config.cv_mode) ?? "unavailable";
 	const vvMode = getState(config.vv_mode) ?? "unavailable";
 	const cvNight = config.cv_night ? getState(config.cv_night) : null;
@@ -75,24 +82,24 @@ export function buildDiagramView({ hass, config, imageBase }) {
 	const cvPumpState = config.cv_pump_icon ? getState(config.cv_pump_icon) : null;
 	const defrostState = config.defrost_icon ? getState(config.defrost_icon) : null;
 
-	const cvIconColor =
-		cvMode === "Off" || cvMode === "unavailable"
-			? "var(--disabled-text-color)"
-			: "var(--state-climate-heat-color, var(--accent-color))";
+	const cvActive = isModeActive(cvMode);
+	const vvActive = isModeActive(vvMode);
+	const auxActive = isModeActive(auxHeating);
 
-	const vvIconColor =
-		vvMode === "Off" || vvMode === "unavailable"
-			? "var(--disabled-text-color)"
-			: "var(--state-water-heater-heat-color, var(--accent-color))";
+	const cvIconColor = cvActive
+			? "var(--state-climate-heat-color, var(--accent-color))"
+			: "var(--disabled-text-color)";
 
-	const auxIconColor =
-		auxHeating && auxHeating !== "Off"
+	const vvIconColor = vvActive
+			? "var(--state-water-heater-heat-color, var(--accent-color))"
+			: "var(--disabled-text-color)";
+
+	const auxIconColor = auxActive
 			? "var(--warning-color, #fdd835)"
 			: "var(--disabled-text-color)";
 
-	const vvScheduleColor =
-		vvSchedule && vvSchedule !== "Constant off"
-			? "var(--secondary-text-color)"
+	const vvScheduleColor = vvActive
+			? "var(--state-water-heater-heat-color, var(--accent-color))"
 			: "var(--disabled-text-color)";
 
 	const infoEntities = Array.isArray(config.info_entities) ? config.info_entities : [];
@@ -110,6 +117,21 @@ export function buildDiagramView({ hass, config, imageBase }) {
 	const cvNightIcon = cvNight ? CV_NIGHT_ICONS[cvNight] ?? null : null;
 	const vvScheduleIcon = vvSchedule ? VV_SCHEDULE_ICONS[vvSchedule] ?? null : null;
 
+	const heatCurveChipHtml = `
+    <div class="mode-bar mode-bar--bottom">
+      <div class="mode-chip heat-curve-trigger mode-chip--info mode-chip--active clickable" data-heat-curve-trigger="true">
+        <ha-icon icon="mdi:chart-bell-curve-cumulative"></ha-icon>
+        <span class="chip-label">CV Curve</span>
+        ${curveTemp !== null ? `<span class="chip-value">${valueWithUnit("curve", curveTemp)}</span>` : ""}
+      </div>
+    </div>
+  `;
+
+	const infoChipClasses = "mode-chip popup-chip mode-chip--info mode-chip--active";
+	const cvChipClasses = `mode-chip popup-chip ${chipStateClass(cvActive)}`;
+	const vvChipClasses = `mode-chip popup-chip ${chipStateClass(vvActive)}`;
+	const auxChipClasses = `mode-chip popup-chip ${chipStateClass(auxActive)}`;
+
 	const html = `
     <img src="${imageBase}/dvi.gif" class="diagram-base" alt="LV diagram" />
 
@@ -122,16 +144,7 @@ export function buildDiagramView({ hass, config, imageBase }) {
 				: ""
 		}
 
-    <div class="diagram-label heat-curve-trigger" data-heat-curve-trigger="true">Kurvetemperatur</div>
-
-    ${
-			curveTemp !== null
-				? `<div class="diagram-label label-curve" data-key="curve">${valueWithUnit(
-						"curve",
-						curveTemp,
-				  )}</div>`
-				: ""
-		}
+    ${"" /* heat-curve label moved into bottom chip */}
 
     ${
 			evapTemp !== null
@@ -223,7 +236,7 @@ export function buildDiagramView({ hass, config, imageBase }) {
     <div class="mode-bar">
       ${
 				infoEntities.length
-					? `<div class="mode-chip popup-chip" data-popup="info">
+					? `<div class="${infoChipClasses}" data-popup="info">
                <ha-icon icon="mdi:information-slab-circle"></ha-icon>
                <span class="chip-label">Info</span>
                ${power !== null ? `<span class="chip-value">${power} kW</span>` : ""}
@@ -233,7 +246,7 @@ export function buildDiagramView({ hass, config, imageBase }) {
 
       ${
 				cvEntities.length
-					? `<div class="mode-chip popup-chip" data-popup="cv">
+					? `<div class="${cvChipClasses}" data-popup="cv">
                <ha-icon icon="mdi:radiator" style="color:${cvIconColor};"></ha-icon>
                ${
 									cvNightIcon
@@ -247,7 +260,7 @@ export function buildDiagramView({ hass, config, imageBase }) {
 
       ${
 				vvEntities.length
-					? `<div class="mode-chip popup-chip" data-popup="vv">
+					? `<div class="${vvChipClasses}" data-popup="vv">
                <ha-icon icon="mdi:shower-head" style="color:${vvIconColor};"></ha-icon>
                ${
 									vvScheduleIcon
@@ -261,13 +274,14 @@ export function buildDiagramView({ hass, config, imageBase }) {
 
       ${
 				auxEntities.length
-					? `<div class="mode-chip popup-chip" data-popup="aux">
+					? `<div class="${auxChipClasses}" data-popup="aux">
                <ha-icon icon="mdi:lightning-bolt-outline" style="color:${auxIconColor};"></ha-icon>
                <span class="chip-label">AUX</span>
              </div>`
 					: ""
 			}
     </div>
+    ${heatCurveChipHtml}
   `;
 
 	return {

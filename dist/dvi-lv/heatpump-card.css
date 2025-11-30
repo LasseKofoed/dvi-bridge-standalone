@@ -50,8 +50,7 @@ ha-card {
 
 .diagram-label.heat-curve-trigger {
 	top: 18%;
-	left: 50%;
-	cursor: pointer;
+	left: 50%;	
 }
 
 .diagram-label.label-outdoor {
@@ -149,19 +148,56 @@ ha-card {
 	gap: 6px;
 }
 
+.mode-bar.mode-bar--bottom {
+	top: auto;
+	bottom: 4%;
+	left: 50%;
+	right: auto;
+	transform: translateX(-50%);
+	justify-content: center;
+	z-index: 5;
+	padding: 0 8px;
+}
+
 .mode-chip {
 	display: flex;
 	align-items: center;
 	gap: 4px;
 	padding: 2px 8px;
 	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.9);
-	box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+	background: var(--chip-bg, rgba(255, 255, 255, 0.95));
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 	cursor: pointer;
+	font-weight: 600;
+	color: var(--chip-text-color, var(--primary-text-color));
+	transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.mode-chip--active {
+	border-color: var(--chip-accent, var(--accent-color));
+	background: var(--chip-active-bg, rgba(255, 255, 255, 0.85));
+	color: var(--chip-active-text, var(--primary-text-color));
+}
+
+.mode-chip--inactive {
+	opacity: 0.65;
+	color: var(--disabled-text-color);
+}
+
+.mode-chip--info {
+	background: var(--chip-info-background, rgba(56, 126, 245, 0.18));
+	border-color: var(--chip-info-border, rgba(56, 126, 245, 0.5));
+	color: var(--chip-info-text, #0d47a1);
 }
 
 .mode-chip ha-icon {
 	--mdc-icon-size: 18px;
+	color: inherit;
+}
+
+.mode-chip--info ha-icon {
+	color: inherit;
 }
 
 .small-mode-icon {
@@ -171,11 +207,13 @@ ha-card {
 
 .chip-label {
 	font-size: 0.75em;
+	color: inherit;
 }
 
 .chip-value {
 	font-size: 0.75em;
 	font-weight: 600;
+	color: inherit;
 }
 
 /* ============ Heat-Curve Card Shell ============ */
@@ -237,6 +275,8 @@ ha-card {
 	padding: 6px 12px;
 	cursor: pointer;
 }
+
+/* ============ Mobile View ============ */
 
 @media (max-width: 500px) {
 	.chip-label {
